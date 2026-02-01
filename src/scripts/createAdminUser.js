@@ -35,11 +35,20 @@ const createAdminUser = async () => {
     
     if (existingUser) {
       console.log('ℹ️  User with this email already exists');
+      let updated = false;
       if (existingUser.role !== 'admin') {
           console.log('Updating user role to admin...');
           existingUser.role = 'admin';
+          updated = true;
+      }
+      if (!existingUser.isVerified) {
+          console.log('Verifying admin email...');
+          existingUser.isVerified = true;
+          updated = true;
+      }
+      if (updated) {
           await existingUser.save();
-          console.log('✅ User role updated to admin');
+          console.log('✅ User updated to verified admin');
       }
       process.exit(0);
     }
@@ -48,7 +57,8 @@ const createAdminUser = async () => {
       name: 'Admin User',
       email,
       password, // Passing plain password, assuming model hashes it
-      role: 'admin'
+      role: 'admin',
+      isVerified: true // Admin emails are auto-verified
     });
 
     console.log('✅ Admin user created successfully!');

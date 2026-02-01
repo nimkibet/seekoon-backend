@@ -63,7 +63,22 @@ const userSchema = new mongoose.Schema({
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Product'
     }
-  }]
+  }],
+  isVerified: {
+    type: Boolean,
+    default: false
+  },
+  verificationToken: {
+    type: String,
+    default: ''
+  },
+  resetPasswordToken: {
+    type: String,
+    default: ''
+  },
+  resetPasswordExpire: {
+    type: Date
+  }
 }, {
   timestamps: true
 });

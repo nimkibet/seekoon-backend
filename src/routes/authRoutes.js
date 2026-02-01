@@ -1,5 +1,5 @@
 import express from 'express';
-import { register, login, getMe, unifiedAuth, updateProfile } from '../controllers/authController.js';
+import { register, login, getMe, unifiedAuth, updateProfile, forgotPassword, resetPassword, verifyEmail, resendVerificationEmail } from '../controllers/authController.js';
 import { authMiddleware } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -28,6 +28,26 @@ router.get('/me', authMiddleware, getMe);
 // @desc    Update current user profile
 // @access  Private
 router.put('/me', authMiddleware, updateProfile);
+
+// @route   POST /api/auth/forgot-password
+// @desc    Request password reset
+// @access  Public
+router.post('/forgot-password', forgotPassword);
+
+// @route   POST /api/auth/reset-password/:token
+// @desc    Reset password with token
+// @access  Public
+router.post('/reset-password/:token', resetPassword);
+
+// @route   GET /api/auth/verify-email/:token
+// @desc    Verify email address
+// @access  Public
+router.get('/verify-email/:token', verifyEmail);
+
+// @route   POST /api/auth/resend-verification
+// @desc    Resend verification email
+// @access  Public
+router.post('/resend-verification', resendVerificationEmail);
 
 export default router;
 
