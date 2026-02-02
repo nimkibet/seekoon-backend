@@ -26,8 +26,25 @@ if (!isEnvValid) {
 const app = express();
 
 // Middleware
+// CORS configuration - explicitly allow production frontend
+const allowedOrigins = [
+  'https://seekon-front-end.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:5177',
+];
+
 app.use(cors({
-  origin: true, // 👈 ALLOWS ANYONE (Great for fixing this specific error)
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.warn(`CORS blocked origin: ${origin}`);
+      callback(null, true); // Allow for now in production
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
@@ -90,9 +107,10 @@ const startServer = async () => {
     
     // Start listening
     app.listen(PORT, () => {
+      const isProduction = process.env.NODE_ENV === 'production';
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📍 Environment: ${process.env.NODE_ENV}`);
-      console.log(`✅ Visit: http://localhost:${PORT}`);
+      console.log(`✅ API URL: ${isProduction ? 'https://seekoon-backend-production.up.railway.app' : 'http://localhost:' + PORT}`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error.message);

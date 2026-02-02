@@ -114,7 +114,7 @@ export const initiateMpesaPayment = async (req, res) => {
 
     // STK Push request
     const shortcode = process.env.SHORTCODE || process.env.DARAJA_BUSINESS_SHORTCODE;
-    const callbackURL = process.env.CALLBACK_URL || 'http://localhost:3000';
+    const callbackURL = process.env.CALLBACK_URL || 'https://seekoon-backend-production.up.railway.app/api/payment/mpesa-callback';
 
     const stkPushData = {
       BusinessShortCode: shortcode,

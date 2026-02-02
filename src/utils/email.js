@@ -92,7 +92,7 @@ const logEmailToConsole = (type, to, url) => {
 
 // Function to send verification email
 export const sendVerificationEmail = async (email, token) => {
-  const verificationUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/verify-email/${token}`;
+  const verificationUrl = `${process.env.FRONTEND_URL || 'https://seekon-front-end.vercel.app'}/verify-email/${token}`;
   
   // Try to get transporter
   const mailer = getTransporter();
@@ -146,7 +146,7 @@ export const sendVerificationEmail = async (email, token) => {
 
 // Function to send password reset email
 export const sendPasswordResetEmail = async (email, token) => {
-  const resetUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/reset-password/${token}`;
+  const resetUrl = `${process.env.FRONTEND_URL || 'https://seekon-front-end.vercel.app'}/reset-password/${token}`;
   
   // Try to get transporter
   const mailer = getTransporter();
