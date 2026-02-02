@@ -25,21 +25,20 @@ if (!isEnvValid) {
 // Initialize Express app
 const app = express();
 
-// Middleware
+// ⚠️ CRITICAL: Handle CORS preflight requests FIRST - before any other middleware
+app.options('*', cors({
+  origin: process.env.FRONTEND_URL || 'https://seekon-front-end.vercel.app',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
+}));
+
 // CORS configuration - explicitly allow production frontend
 const allowedOrigins = [
   process.env.FRONTEND_URL || 'https://seekon-front-end.vercel.app',
   'http://localhost:5173',
   'http://localhost:5177',
 ];
-
-// Handle CORS preflight requests before other routes
-app.options('*', cors({
-  origin: allowedOrigins,
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
-}));
 
 app.use(cors({
   origin: function(origin, callback) {
