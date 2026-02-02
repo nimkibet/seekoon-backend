@@ -1,74 +1,39 @@
-// Email utility with optional nodemailer support
-import { createRequire } from 'module';
+// Email utility using Resend API for production
+import { Resend } from 'resend';
 import { isServiceConfigured, getMissingConfig } from '../config/checkEnv.js';
 
-let transporter = null;
-let nodemailerChecked = false;
-const emailConfigured = isServiceConfigured('email');
+let resendClient = null;
+let resendChecked = false;
+const resendConfigured = isServiceConfigured('resend');
 
-// Try to load nodemailer using createRequire (works in ESM)
-const loadNodemailer = () => {
-  try {
-    const require = createRequire(import.meta.url);
-    const nodemailer = require('nodemailer');
-    return nodemailer;
-  } catch (e) {
-    return null;
-  }
-};
-
-// Get or create email transporter
-const getTransporter = () => {
-  if (transporter) return transporter;
-  if (nodemailerChecked) return null;
+// Load Resend client
+const getResendClient = () => {
+  if (resendClient) return resendClient;
+  if (resendChecked) return null;
   
-  // Check if email is configured using centralized check
-  if (!emailConfigured) {
-    const missing = getMissingConfig('email');
-    console.warn('⚠️  Email service is not configured - emails will be logged to console');
+  // Check if Resend is configured
+  if (!resendConfigured) {
+    const missing = getMissingConfig('resend');
+    console.warn('⚠️  Resend API is not configured - emails will be logged to console');
     if (missing.length > 0) {
       console.warn('   Missing configuration:');
       missing.forEach(({ name }) => {
         console.warn(`   - ${name}`);
       });
     }
-    nodemailerChecked = true;
-    return null;
-  }
-  
-  const nodemailer = loadNodemailer();
-  if (!nodemailer) {
-    nodemailerChecked = true;
+    resendChecked = true;
     return null;
   }
   
   try {
-    // Use port 465 (SSL) instead of 587 if EMAIL_PORT is set to 465
-    const useSSL = process.env.EMAIL_PORT === '465';
-    
-    transporter = nodemailer.createTransport({
-      host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-      port: parseInt(process.env.EMAIL_PORT || '587'),
-      secure: useSSL, // true for 465, false for 587
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-      },
-      tls: {
-        rejectUnauthorized: false
-      },
-      // Add connection timeout
-      connectionTimeout: 10000, // 10 seconds
-      greetingTimeout: 10000,
-      socketTimeout: 10000
-    });
-    console.log('✅ Email transporter configured successfully');
+    resendClient = new Resend(process.env.RESEND_API_KEY);
+    console.log('✅ Resend client initialized successfully');
   } catch (error) {
-    console.error('❌ Failed to create email transporter:', error.message);
+    console.error('❌ Failed to initialize Resend client:', error.message);
   }
   
-  nodemailerChecked = true;
-  return transporter;
+  resendChecked = true;
+  return resendClient;
 };
 
 // Log email to console for development
@@ -80,25 +45,26 @@ const logEmailToConsole = (type, to, url) => {
   console.log(` To:      ${to}`);
   console.log(` Link:    ${url}`);
   console.log(line);
-  console.log(' \n ⚠️  EMAIL CONFIGURATION INCOMPLETE');
+  console.log(' \n ⚠️  RESEND API NOT CONFIGURED');
   console.log('    To enable real emails:');
-  console.log('    1. Ensure nodemailer is installed: npm install nodemailer');
-  console.log('    2. Add to server/.env:');
-  console.log('       EMAIL_USER=your-email@gmail.com');
-  console.log('       EMAIL_PASS=your-app-password');
-  console.log('    3. Restart the server');
+  console.log('    1. Sign up at https://resend.com');
+  console.log('    2. Get your API key from https://resend.com/api-keys');
+  console.log('    3. Add to server/.env:');
+  console.log('       RESEND_API_KEY=re_123456789');
+  console.log('    4. Restart the server');
   console.log(' ' + line + '\n');
 };
 
 // Function to send verification email
 export const sendVerificationEmail = async (email, token) => {
-  const verificationUrl = `${process.env.FRONTEND_URL || 'https://seekon-front-end.vercel.app'}/verify-email/${token}`;
+  const frontendUrl = process.env.FRONTEND_URL || 'https://seekon-front-end.vercel.app';
+  const verificationUrl = `${frontendUrl}/verify-email/${token}`;
   
-  // Try to get transporter
-  const mailer = getTransporter();
+  // Try to get Resend client
+  const resend = getResendClient();
   
-  // Development mode - log to console if no mailer
-  if (!mailer) {
+  // Development mode - log to console if no client
+  if (!resend) {
     logEmailToConsole('VERIFICATION EMAIL', email, verificationUrl);
     return { 
       success: true, 
@@ -108,51 +74,48 @@ export const sendVerificationEmail = async (email, token) => {
     };
   }
 
-  const mailOptions = {
-    from: `"Seekon" <${process.env.EMAIL_USER}>`,
-    to: email,
-    subject: 'Verify Your Email Address',
-    html: `
-      <h2>Verify Your Email</h2>
-      <p>Thank you for registering with Seekon. Please click the link below to verify your email address:</p>
-      <a href="${verificationUrl}" style="display: inline-block; padding: 10px 20px; color: white; background-color: #007bff; text-decoration: none; border-radius: 5px;">Verify Email</a>
-      <p>If the button above doesn't work, copy and paste this link into your browser:</p>
-      <p>${verificationUrl}</p>
-      <p>This link will expire in 24 hours.</p>
-      <p>If you did not create an account with Seekon, please ignore this email.</p>
-    `
-  };
-
   try {
-    await mailer.sendMail(mailOptions);
-    console.log(`✅ Verification email sent to ${email}`);
-    return { success: true, message: 'Verification email sent successfully' };
+    const data = await resend.emails.send({
+      from: 'Seekon <onboarding@resend.dev>',
+      to: email,
+      subject: 'Verify Your Email Address',
+      html: `
+        <h2>Verify Your Email</h2>
+        <p>Thank you for registering with Seekon. Please click the link below to verify your email address:</p>
+        <a href="${verificationUrl}" style="display: inline-block; padding: 10px 20px; color: white; background-color: #007bff; text-decoration: none; border-radius: 5px;">Verify Email</a>
+        <p>If the button above doesn't work, copy and paste this link into your browser:</p>
+        <p>${verificationUrl}</p>
+        <p>This link will expire in 24 hours.</p>
+        <p>If you did not create an account with Seekon, please ignore this email.</p>
+      `
+    });
+    console.log(`✅ Verification email sent to ${email}:`, data);
+    return { success: true, message: 'Verification email sent successfully', data };
   } catch (error) {
     console.error('❌ Error sending verification email:', error.message);
-    // Fall back to console logging on connection error
-    if (error.code === 'ESOCKET' || error.code === 'ETIMEDOUT' || error.code === 'ECONNREFUSED') {
-      console.log('⚠️  Email server connection failed. Falling back to console logging...');
-      logEmailToConsole('VERIFICATION EMAIL', email, verificationUrl);
-      return {
-        success: true,
-        message: 'Email logged to console (SMTP connection failed - check your network/firewall)',
-        development: true,
-        verificationUrl
-      };
-    }
-    return { success: false, message: 'Failed to send verification email', error: error.message };
+    console.error('   Full error:', JSON.stringify(error, null, 2));
+    // Fall back to console logging on error
+    console.log('⚠️  Resend API failed. Falling back to console logging...');
+    logEmailToConsole('VERIFICATION EMAIL', email, verificationUrl);
+    return {
+      success: true,
+      message: 'Email logged to console (Resend API failed)',
+      development: true,
+      verificationUrl
+    };
   }
 };
 
 // Function to send password reset email
 export const sendPasswordResetEmail = async (email, token) => {
-  const resetUrl = `${process.env.FRONTEND_URL || 'https://seekon-front-end.vercel.app'}/reset-password/${token}`;
+  const frontendUrl = process.env.FRONTEND_URL || 'https://seekon-front-end.vercel.app';
+  const resetUrl = `${frontendUrl}/reset-password/${token}`;
   
-  // Try to get transporter
-  const mailer = getTransporter();
+  // Try to get Resend client
+  const resend = getResendClient();
   
-  // Development mode - log to console if no mailer
-  if (!mailer) {
+  // Development mode - log to console if no client
+  if (!resend) {
     logEmailToConsole('PASSWORD RESET EMAIL', email, resetUrl);
     return { 
       success: true, 
@@ -162,38 +125,34 @@ export const sendPasswordResetEmail = async (email, token) => {
     };
   }
   
-  const mailOptions = {
-    from: `"Seekon" <${process.env.EMAIL_USER}>`,
-    to: email,
-    subject: 'Reset Your Password',
-    html: `
-      <h2>Password Reset Request</h2>
-      <p>We received a request to reset your password. Click the link below to set a new password:</p>
-      <a href="${resetUrl}" style="display: inline-block; padding: 10px 20px; color: white; background-color: #007bff; text-decoration: none; border-radius: 5px;">Reset Password</a>
-      <p>If the button above doesn't work, copy and paste this link into your browser:</p>
-      <p>${resetUrl}</p>
-      <p>This link will expire in 10 minutes for security reasons.</p>
-      <p>If you did not request a password reset, please ignore this email or contact support.</p>
-    `
-  };
-
   try {
-    await mailer.sendMail(mailOptions);
-    console.log(`✅ Password reset email sent to ${email}`);
-    return { success: true, message: 'Password reset email sent successfully' };
+    const data = await resend.emails.send({
+      from: 'Seekon <onboarding@resend.dev>',
+      to: email,
+      subject: 'Reset Your Password',
+      html: `
+        <h2>Password Reset Request</h2>
+        <p>We received a request to reset your password. Click the link below to set a new password:</p>
+        <a href="${resetUrl}" style="display: inline-block; padding: 10px 20px; color: white; background-color: #007bff; text-decoration: none; border-radius: 5px;">Reset Password</a>
+        <p>If the button above doesn't work, copy and paste this link into your browser:</p>
+        <p>${resetUrl}</p>
+        <p>This link will expire in 10 minutes for security reasons.</p>
+        <p>If you did not request a password reset, please ignore this email or contact support.</p>
+      `
+    });
+    console.log(`✅ Password reset email sent to ${email}:`, data);
+    return { success: true, message: 'Password reset email sent successfully', data };
   } catch (error) {
     console.error('❌ Error sending password reset email:', error.message);
-    // Fall back to console logging on connection error
-    if (error.code === 'ESOCKET' || error.code === 'ETIMEDOUT' || error.code === 'ECONNREFUSED') {
-      console.log('⚠️  Email server connection failed. Falling back to console logging...');
-      logEmailToConsole('PASSWORD RESET EMAIL', email, resetUrl);
-      return {
-        success: true,
-        message: 'Email logged to console (SMTP connection failed - check your network/firewall)',
-        development: true,
-        resetUrl
-      };
-    }
-    return { success: false, message: 'Failed to send password reset email', error: error.message };
+    console.error('   Full error:', JSON.stringify(error, null, 2));
+    // Fall back to console logging on error
+    console.log('⚠️  Resend API failed. Falling back to console logging...');
+    logEmailToConsole('PASSWORD RESET EMAIL', email, resetUrl);
+    return {
+      success: true,
+      message: 'Email logged to console (Resend API failed)',
+      development: true,
+      resetUrl
+    };
   }
 };

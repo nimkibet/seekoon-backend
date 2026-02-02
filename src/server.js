@@ -2,6 +2,12 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+// 🚨 CRITICAL: Exit immediately if JWT_SECRET is not configured
+if (!process.env.JWT_SECRET) {
+  console.error("❌ JWT_SECRET is missing! Set it in .env file or Railway Environment Variables.");
+  process.exit(1);
+}
+
 import express from 'express';
 import cors from 'cors';
 import { validateEnv } from './config/checkEnv.js';

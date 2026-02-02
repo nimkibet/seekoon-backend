@@ -21,7 +21,8 @@ export const envStatus = {
 
 // CRITICAL: Server cannot run without these
 const CRITICAL_VARS = [
-  { key: 'MONGO_URI', name: 'MongoDB Connection', description: 'MongoDB connection string' }
+  { key: 'MONGO_URI', name: 'MongoDB Connection', description: 'MongoDB connection string' },
+  { key: 'JWT_SECRET', name: 'JWT Secret', description: 'Secret for signing JWT tokens - REQUIRED for authentication' }
 ];
 
 // OPTIONAL: Server can run, but features will be disabled
@@ -29,9 +30,7 @@ const OPTIONAL_VARS = [
   { key: 'CLOUDINARY_CLOUD_NAME', name: 'Cloudinary Cloud Name', description: 'Cloud storage for image uploads' },
   { key: 'CLOUDINARY_API_KEY', name: 'Cloudinary API Key', description: 'API key for Cloudinary' },
   { key: 'CLOUDINARY_API_SECRET', name: 'Cloudinary API Secret', description: 'API secret for Cloudinary' },
-  { key: 'EMAIL_USER', name: 'Email Address', description: 'Email address for sending emails' },
-  { key: 'EMAIL_PASS', name: 'Email Password', description: 'Email password or app password' },
-  { key: 'JWT_SECRET', name: 'JWT Secret', description: 'Secret for signing JWT tokens' }
+  { key: 'RESEND_API_KEY', name: 'Resend API Key', description: 'API key for Resend email service' }
 ];
 
 /**
@@ -98,6 +97,7 @@ export const isServiceConfigured = (serviceName) => {
   const serviceKeys = {
     cloudinary: ['CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'],
     email: ['EMAIL_USER', 'EMAIL_PASS'],
+    resend: ['RESEND_API_KEY'],
     mongodb: ['MONGO_URI'],
     jwt: ['JWT_SECRET']
   };
@@ -118,9 +118,8 @@ export const getMissingConfig = (serviceName) => {
       { key: 'CLOUDINARY_API_KEY', name: 'API Key' },
       { key: 'CLOUDINARY_API_SECRET', name: 'API Secret' }
     ],
-    email: [
-      { key: 'EMAIL_USER', name: 'Email User' },
-      { key: 'EMAIL_PASS', name: 'Email Password' }
+    resend: [
+      { key: 'RESEND_API_KEY', name: 'API Key' }
     ]
   };
   
