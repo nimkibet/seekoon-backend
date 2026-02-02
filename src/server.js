@@ -28,7 +28,7 @@ const app = express();
 // Middleware
 // CORS configuration - explicitly allow production frontend
 const allowedOrigins = [
-  'https://seekon-front-end.vercel.app',
+  process.env.FRONTEND_URL || 'https://seekon-front-end.vercel.app',
   'http://localhost:5173',
   'http://localhost:5177',
 ];
