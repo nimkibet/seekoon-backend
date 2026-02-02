@@ -15,7 +15,6 @@ import { connectDB } from './config/db.js';
 import routes from './routes/index.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import fs from 'fs';
 
 // ES Module dirname fix
 const __filename = fileURLToPath(import.meta.url);
@@ -31,9 +30,13 @@ if (!isEnvValid) {
 // Initialize Express app
 const app = express();
 
+// Get frontend URL from environment or use default
+const frontendUrl = process.env.FRONTEND_URL || 'https://seekon-front-end.vercel.app';
+console.log(`🌐 Frontend URL configured: ${frontendUrl}`);
+
 // ⚠️ CRITICAL: Handle CORS preflight requests FIRST - before any other middleware
 app.options('*', cors({
-  origin: process.env.FRONTEND_URL || 'https://seekon-front-end.vercel.app',
+  origin: frontendUrl,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
@@ -41,7 +44,7 @@ app.options('*', cors({
 
 // CORS configuration - explicitly allow production frontend
 const allowedOrigins = [
-  process.env.FRONTEND_URL || 'https://seekon-front-end.vercel.app',
+  frontendUrl,
   'http://localhost:5173',
   'http://localhost:5177',
 ];
@@ -54,7 +57,7 @@ app.use(cors({
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      console.warn(`CORS blocked origin: ${origin}`);
+      console.warn(`CORS blocked origin: ${origin} - but allowing for development`);
       callback(null, true); // Allow for now in production
     }
   },
@@ -64,12 +67,6 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Create uploads directory if it doesn't exist
-const uploadsDir = path.join(__dirname, '../../uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
 
 // Root route
 app.get('/', (req, res) => {

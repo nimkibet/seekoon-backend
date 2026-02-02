@@ -1,5 +1,4 @@
-import fs from 'fs';
-import { uploadToCloudinary, deleteFromCloudinary } from '../config/cloudinary.js';
+import { uploadBufferToCloudinary, deleteFromCloudinary } from '../config/cloudinary.js';
 
 /**
  * @route   POST /api/upload
@@ -15,11 +14,8 @@ export const uploadFile = async (req, res) => {
       });
     }
 
-    // Upload to Cloudinary
-    const result = await uploadToCloudinary(req.file.path);
-
-    // Delete temporary file
-    fs.unlinkSync(req.file.path);
+    // Upload buffer directly to Cloudinary (no disk write needed)
+    const result = await uploadBufferToCloudinary(req.file.buffer, 'seekon-apparel');
 
     res.status(200).json({
       success: true,
@@ -30,15 +26,6 @@ export const uploadFile = async (req, res) => {
       }
     });
   } catch (error) {
-    // Delete temporary file if it exists
-    if (req.file && req.file.path) {
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (unlinkError) {
-        console.error('Error deleting temporary file:', unlinkError);
-      }
-    }
-
     console.error('Upload error details:', error);
     console.error('Cloudinary config:', {
       cloud_name: process.env.CLOUDINARY_CLOUD_NAME ? 'Set' : 'Not set',

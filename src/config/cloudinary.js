@@ -51,6 +51,38 @@ export const uploadToCloudinary = async (filePath, folder = 'seekon-apparel') =>
 };
 
 /**
+ * Upload file buffer to Cloudinary using upload_stream
+ * @param {Buffer} fileBuffer - Buffer of the file to upload
+ * @param {String} folder - Folder name in Cloudinary
+ * @returns {Object} Upload result with URL
+ */
+export const uploadBufferToCloudinary = async (fileBuffer, folder = 'seekon-apparel') => {
+  if (!cloudinaryConfigured) {
+    throw new Error('Cloudinary is not configured. Please set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET environment variables.');
+  }
+  
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder,
+        resource_type: 'auto',
+      },
+      (error, result) => {
+        if (error) {
+          reject(new Error(`Cloudinary upload stream failed: ${error.message}`));
+        } else {
+          resolve({
+            url: result.secure_url,
+            public_id: result.public_id,
+          });
+        }
+      }
+    );
+    uploadStream.end(fileBuffer);
+  });
+};
+
+/**
  * Delete file from Cloudinary
  * @param {String} publicId - Public ID of the file to delete
  */

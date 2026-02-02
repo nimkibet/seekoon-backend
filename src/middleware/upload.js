@@ -2,17 +2,10 @@ import multer from 'multer';
 import path from 'path';
 
 /**
- * Configure Multer for file uploads
+ * Configure Multer for file uploads using memory storage
+ * Files are kept in memory temporarily and sent directly to Cloudinary
  */
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/');
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
+const storage = multer.memoryStorage();
 
 // File filter function
 const fileFilter = (req, file, cb) => {
@@ -37,7 +30,3 @@ export const upload = multer({
   },
   fileFilter: fileFilter
 });
-
-
-
-
