@@ -1,8 +1,10 @@
 // Email utility with optional nodemailer support
 import { createRequire } from 'module';
+import { isServiceConfigured, getMissingConfig } from '../config/checkEnv.js';
 
 let transporter = null;
 let nodemailerChecked = false;
+const emailConfigured = isServiceConfigured('email');
 
 // Try to load nodemailer using createRequire (works in ESM)
 const loadNodemailer = () => {
@@ -20,39 +22,49 @@ const getTransporter = () => {
   if (transporter) return transporter;
   if (nodemailerChecked) return null;
   
+  // Check if email is configured using centralized check
+  if (!emailConfigured) {
+    const missing = getMissingConfig('email');
+    console.warn('⚠️  Email service is not configured - emails will be logged to console');
+    if (missing.length > 0) {
+      console.warn('   Missing configuration:');
+      missing.forEach(({ name }) => {
+        console.warn(`   - ${name}`);
+      });
+    }
+    nodemailerChecked = true;
+    return null;
+  }
+  
   const nodemailer = loadNodemailer();
   if (!nodemailer) {
     nodemailerChecked = true;
     return null;
   }
   
-  if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-    try {
-      // Use port 465 (SSL) instead of 587 if EMAIL_PORT is set to 465
-      const useSSL = process.env.EMAIL_PORT === '465';
-      
-      transporter = nodemailer.createTransport({
-        host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-        port: parseInt(process.env.EMAIL_PORT || '587'),
-        secure: useSSL, // true for 465, false for 587
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASS
-        },
-        tls: {
-          rejectUnauthorized: false
-        },
-        // Add connection timeout
-        connectionTimeout: 10000, // 10 seconds
-        greetingTimeout: 10000,
-        socketTimeout: 10000
-      });
-      console.log('✅ Email transporter configured successfully');
-    } catch (error) {
-      console.error('❌ Failed to create email transporter:', error.message);
-    }
-  } else {
-    console.warn('⚠️  EMAIL_USER or EMAIL_PASS not set in environment');
+  try {
+    // Use port 465 (SSL) instead of 587 if EMAIL_PORT is set to 465
+    const useSSL = process.env.EMAIL_PORT === '465';
+    
+    transporter = nodemailer.createTransport({
+      host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+      port: parseInt(process.env.EMAIL_PORT || '587'),
+      secure: useSSL, // true for 465, false for 587
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      },
+      tls: {
+        rejectUnauthorized: false
+      },
+      // Add connection timeout
+      connectionTimeout: 10000, // 10 seconds
+      greetingTimeout: 10000,
+      socketTimeout: 10000
+    });
+    console.log('✅ Email transporter configured successfully');
+  } catch (error) {
+    console.error('❌ Failed to create email transporter:', error.message);
   }
   
   nodemailerChecked = true;

@@ -1,17 +1,26 @@
+// Load environment variables FIRST - before any other imports use them
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
+import { validateEnv } from './config/checkEnv.js';
 import { connectDB } from './config/db.js';
 import routes from './routes/index.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 
 // ES Module dirname fix
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load environment variables
-dotenv.config();
+// Validate all environment variables at startup
+const isEnvValid = validateEnv();
+if (!isEnvValid) {
+  console.error('❌ Server startup aborted due to missing critical environment variables.');
+  process.exit(1);
+}
 
 // Initialize Express app
 const app = express();
@@ -27,7 +36,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Create uploads directory if it doesn't exist
-import fs from 'fs';
 const uploadsDir = path.join(__dirname, '../../uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
@@ -71,8 +79,8 @@ app.use((req, res) => {
   });
 });
 
-// Server configuration
-const PORT = process.env.PORT || 3000;
+// Server configuration - Railway assigns its own port
+const PORT = process.env.PORT || 5000;
 
 // Start server
 const startServer = async () => {

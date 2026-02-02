@@ -1,16 +1,29 @@
 import { v2 as cloudinary } from 'cloudinary';
-import dotenv from 'dotenv';
+import { isServiceConfigured, getMissingConfig } from './checkEnv.js';
 
-dotenv.config();
+// Check if Cloudinary is configured
+const cloudinaryConfigured = isServiceConfigured('cloudinary');
 
-/**
- * Configure Cloudinary for file uploads
- */
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+if (cloudinaryConfigured) {
+  /**
+   * Configure Cloudinary for file uploads
+   */
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
+  console.log('✅ Cloudinary configured successfully');
+} else {
+  const missing = getMissingConfig('cloudinary');
+  console.warn('⚠️  Cloudinary is not configured - image uploads will be disabled');
+  if (missing.length > 0) {
+    console.warn('   Missing configuration:');
+    missing.forEach(({ name }) => {
+      console.warn(`   - ${name}`);
+    });
+  }
+}
 
 /**
  * Upload file to Cloudinary
@@ -19,6 +32,10 @@ cloudinary.config({
  * @returns {Object} Upload result with URL
  */
 export const uploadToCloudinary = async (filePath, folder = 'seekon-apparel') => {
+  if (!cloudinaryConfigured) {
+    throw new Error('Cloudinary is not configured. Please set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET environment variables.');
+  }
+  
   try {
     const result = await cloudinary.uploader.upload(filePath, {
       folder,
@@ -38,6 +55,11 @@ export const uploadToCloudinary = async (filePath, folder = 'seekon-apparel') =>
  * @param {String} publicId - Public ID of the file to delete
  */
 export const deleteFromCloudinary = async (publicId) => {
+  if (!cloudinaryConfigured) {
+    console.warn('⚠️  Cloudinary is not configured - cannot delete file');
+    return;
+  }
+  
   try {
     await cloudinary.uploader.destroy(publicId);
   } catch (error) {
