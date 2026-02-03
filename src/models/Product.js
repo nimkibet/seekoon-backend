@@ -87,7 +87,24 @@ const productSchema = new mongoose.Schema({
   },
   tags: [{
     type: String
-  }]
+  }],
+  // Flash Sale fields
+  isFlashSale: {
+    type: Boolean,
+    default: false
+  },
+  flashSalePrice: {
+    type: Number,
+    default: null
+  },
+  saleStartTime: {
+    type: Date,
+    default: null
+  },
+  saleEndTime: {
+    type: Date,
+    default: null
+  }
 }, {
   timestamps: true
 });

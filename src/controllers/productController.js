@@ -1,6 +1,50 @@
 import Product from '../models/Product.js';
 import SystemLog from '../models/SystemLog.js';
 
+// Helper function to calculate active price based on flash sale timing
+const calculateActivePrice = (product) => {
+  const now = new Date();
+  
+  // Check if flash sale is active
+  if (product.isFlashSale && 
+      product.flashSalePrice && 
+      product.saleStartTime && 
+      product.saleEndTime) {
+    const startTime = new Date(product.saleStartTime);
+    const endTime = new Date(product.saleEndTime);
+    
+    if (now >= startTime && now <= endTime) {
+      return {
+        active: true,
+        price: product.flashSalePrice,
+        originalPrice: product.price,
+        endTime: product.saleEndTime
+      };
+    }
+  }
+  
+  return {
+    active: false,
+    price: product.price,
+    originalPrice: null,
+    endTime: null
+  };
+};
+
+// Helper function to transform product with active pricing
+const transformProduct = (product) => {
+  const productObj = product.toObject ? product.toObject() : product;
+  const pricing = calculateActivePrice(productObj);
+  
+  return {
+    ...productObj,
+    activePrice: pricing.price,
+    originalPrice: pricing.originalPrice || productObj.price,
+    isOnFlashSale: pricing.active,
+    flashSaleEndTime: pricing.endTime
+  };
+};
+
 // Get All Products
 export const getAllProducts = async (req, res) => {
   try {
@@ -26,9 +70,12 @@ export const getAllProducts = async (req, res) => {
 
     const total = await Product.countDocuments(query);
 
+    // Transform products with active pricing
+    const transformedProducts = products.map(transformProduct);
+
     res.status(200).json({
       success: true,
-      products,
+      products: transformedProducts,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -57,9 +104,12 @@ export const getProduct = async (req, res) => {
       });
     }
 
+    // Transform product with active pricing
+    const transformedProduct = transformProduct(product);
+
     res.status(200).json({
       success: true,
-      product
+      product: transformedProduct
     });
   } catch (error) {
     console.error('Error fetching product:', error);
