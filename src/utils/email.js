@@ -57,7 +57,7 @@ const logEmailToConsole = (type, to, url) => {
 
 // Function to send verification email
 export const sendVerificationEmail = async (email, token) => {
-  const frontendUrl = process.env.FRONTEND_URL || 'https://seekon-front-end.vercel.app';
+  const frontendUrl = process.env.FRONTEND_URL || 'https://www.seek-on.app';
   const verificationUrl = `${frontendUrl}/verify-email/${token}`;
   
   // Try to get Resend client
@@ -76,7 +76,7 @@ export const sendVerificationEmail = async (email, token) => {
 
   try {
     const data = await resend.emails.send({
-      from: 'Seekon <onboarding@resend.dev>',
+      from: 'Seekon <noreply@seek-on.app>',
       to: email,
       subject: 'Verify Your Email Address',
       html: `
@@ -108,8 +108,8 @@ export const sendVerificationEmail = async (email, token) => {
 
 // Function to send password reset email
 export const sendPasswordResetEmail = async (email, token) => {
-  const frontendUrl = process.env.FRONTEND_URL || 'https://seekon-front-end.vercel.app';
-  const resetUrl = `${frontendUrl}/reset-password/${token}`;
+  // Use the new domain for password reset links
+  const resetUrl = `https://www.seek-on.app/reset-password/${token}`;
   
   // Try to get Resend client
   const resend = getResendClient();
@@ -127,7 +127,7 @@ export const sendPasswordResetEmail = async (email, token) => {
   
   try {
     const data = await resend.emails.send({
-      from: 'Seekon <onboarding@resend.dev>',
+      from: 'Seekon <noreply@seek-on.app>',
       to: email,
       subject: 'Reset Your Password',
       html: `
