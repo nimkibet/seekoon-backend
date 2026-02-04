@@ -94,24 +94,12 @@ export const register = async (req, res) => {
       console.error('Failed to send verification email:', emailResult.error);
     }
 
-    // Generate token with role
-    const token = generateToken(user._id, user.role);
-
+    // Return success WITHOUT logging in - user must verify email first
     res.status(201).json({
       success: true,
-      message: 'User registered successfully. Please check your email to verify your account.',
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        profilePhoto: user.profilePhoto || '',
-        phoneNumber: user.phoneNumber || '',
-        address: user.address || '',
-        createdAt: user.createdAt,
-        isVerified: user.isVerified
-      }
+      message: 'Registration successful! Please check your email to verify your account before logging in.',
+      requiresVerification: true,
+      email: user.email
     });
   } catch (error) {
     console.error('Registration error:', error);
