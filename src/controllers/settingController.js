@@ -15,8 +15,10 @@ export const getFlashSaleSettings = async (req, res) => {
 };
 
 // Update flash sale settings (Admin)
+console.log('UPDATE_FLASH_SALE_SETTINGS', 'Endpoint Hit');
 export const updateFlashSaleSettings = async (req, res) => {
   try {
+    console.log('UPDATE_FLASH_SALE_SETTINGS', req.body);
     const { isActive, endTime } = req.body;
     
     const settings = await Setting.findOneAndUpdate(
@@ -29,6 +31,7 @@ export const updateFlashSaleSettings = async (req, res) => {
       { new: true, upsert: true }
     );
     
+    console.log('UPDATED_FLASH_SALE_SETTINGS', settings);
     res.status(200).json(settings.value);
   } catch (error) {
     res.status(500).json({ message: 'Error updating settings', error: error.message });
