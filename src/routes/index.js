@@ -5,7 +5,6 @@ import paymentRoutes from './paymentRoutes.js';
 import cartRoutes from './cartRoutes.js';
 import wishlistRoutes from './wishlistRoutes.js';
 import adminRoutes from './adminRoutes.js';
-import settingRoutes from './settingRoutes.js';
 import { 
   getAllProducts as getAllProductsPublic, 
   getProduct as getProductPublic 
@@ -20,7 +19,6 @@ router.use('/payment', paymentRoutes);
 router.use('/cart', cartRoutes);
 router.use('/wishlist', wishlistRoutes);
 router.use('/admin', adminRoutes);
-router.use('/settings', settingRoutes);
 
 // Public product routes (no auth required for viewing)
 router.get('/products', getAllProductsPublic);

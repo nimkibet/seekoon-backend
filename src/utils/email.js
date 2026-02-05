@@ -1,4 +1,4 @@
-// Email utility using Resend API for production
+ // Email utility using Resend API for production
 import { Resend } from 'resend';
 import { isServiceConfigured, getMissingConfig } from '../config/checkEnv.js';
 

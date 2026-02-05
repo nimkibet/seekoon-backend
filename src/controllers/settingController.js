@@ -6,9 +6,9 @@ export const getFlashSaleSettings = async (req, res) => {
     const settings = await Setting.findOne({ key: 'flashSale' });
     if (!settings) {
       // Default settings if not found
-      return res.status(200).json({ value: { isActive: false, endTime: null } });
+      return res.status(200).json({ isActive: false, endTime: null });
     }
-    res.status(200).json({ value: settings.value });
+    res.status(200).json(settings.value);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching settings', error: error.message });
   }

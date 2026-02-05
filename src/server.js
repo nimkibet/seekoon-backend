@@ -13,6 +13,7 @@ import cors from 'cors';
 import { validateEnv } from './config/checkEnv.js';
 import { connectDB } from './config/db.js';
 import routes from './routes/index.js';
+import settingRoutes from './routes/settingRoutes.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -87,6 +88,9 @@ app.get('/', (req, res) => {
 
 // API Routes
 app.use('/api', routes);
+
+// Settings routes - mounted directly with /api/settings prefix
+app.use('/api/settings', settingRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
