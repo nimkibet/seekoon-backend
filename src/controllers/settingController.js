@@ -4,12 +4,15 @@ import Setting from '../models/Setting.js';
 export const getFlashSaleSettings = async (req, res) => {
   try {
     const settings = await Setting.findOne({ key: 'flashSale' });
+    console.log('🔍 GET_FLASH_SALE_SETTINGS - Found:', settings ? settings.value : 'default');
     if (!settings) {
       // Default settings if not found
       return res.status(200).json({ isActive: false, endTime: null });
     }
+    // Return the value object directly
     res.status(200).json(settings.value);
   } catch (error) {
+    console.error('❌ GET_FLASH_SALE_SETTINGS Error:', error.message);
     res.status(500).json({ message: 'Error fetching settings', error: error.message });
   }
 };
