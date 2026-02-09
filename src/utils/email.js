@@ -156,3 +156,54 @@ export const sendPasswordResetEmail = async (email, token) => {
     };
   }
 };
+
+// Function to send OTP email
+export const sendOTPEmail = async (email, otp) => {
+  // Log OTP to console for development
+  const line = '='.repeat(50);
+  console.log('\n' + line);
+  console.log(` 📧 OTP EMAIL`);
+  line;
+  console.log(` To:      ${email}`);
+  console.log(` OTP:     ${otp}`);
+  console.log(` Expires: 15 minutes`);
+  console.log(line + '\n');
+  
+  // Try to get Resend client
+  const resend = getResendClient();
+  
+  // Development mode - just log to console
+  if (!resend) {
+    return { 
+      success: true, 
+      message: 'OTP logged to console (check server logs)',
+      development: true,
+      otp
+    };
+  }
+  
+  try {
+    const data = await resend.emails.send({
+      from: 'Seekon <noreply@seek-on.app>',
+      to: email,
+      subject: 'Your Seekon Verification Code',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
+          <h2 style="color: #333;">Verify Your Email</h2>
+          <p>Thank you for registering with Seekon. Please use the verification code below to complete your registration:</p>
+          <div style="background: linear-gradient(135deg, #00A676, #008A5E); color: white; padding: 20px; text-align: center; border-radius: 10px; margin: 20px 0;">
+            <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px;">${otp}</span>
+          </div>
+          <p style="color: #666; font-size: 14px;">This code will expire in <strong>15 minutes</strong> for security reasons.</p>
+          <p style="color: #666; font-size: 14px;">If you did not create an account with Seekon, please ignore this email.</p>
+        </div>
+      `
+    });
+    console.log(`✅ OTP email sent to ${email}:`, data);
+    return { success: true, message: 'OTP email sent successfully', data };
+  } catch (error) {
+    console.error('❌ Error sending OTP email:', error.message);
+    console.error('   Full error:', JSON.stringify(error, null, 2));
+    return { success: false, message: error.message };
+  }
+};

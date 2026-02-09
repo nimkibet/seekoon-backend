@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
-import { sendVerificationEmail, sendPasswordResetEmail } from '../utils/email.js';
+import { sendVerificationEmail, sendPasswordResetEmail, sendOTPEmail } from '../utils/email.js';
 import crypto from 'crypto';
 
 /**
@@ -14,7 +14,7 @@ const generateToken = (userId, role = 'user') => {
 
 /**
  * @route   POST /api/auth/register
- * @desc    Register new user
+ * @desc    Register new user (OTP verification)
  * @access  Public
  */
 export const register = async (req, res) => {
@@ -76,36 +76,118 @@ export const register = async (req, res) => {
       });
     }
 
-    // Create user
+    // Create user (unverified)
     const user = await User.create({
       name,
       email,
       password
     });
 
-    // Generate verification token
-    const verificationToken = crypto.randomBytes(20).toString('hex');
-    user.verificationToken = verificationToken;
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    user.otp = otp;
+    user.otpExpires = Date.now() + 15 * 60 * 1000; // 15 minutes
     await user.save();
 
-    // Send verification email
-    const emailResult = await sendVerificationEmail(user.email, verificationToken);
+    // Send OTP email
+    const emailResult = await sendOTPEmail(user.email, otp);
     if (!emailResult.success) {
-      console.error('Failed to send verification email:', emailResult.error);
+      console.error('Failed to send OTP email:', emailResult.message);
     }
 
-    // Return success WITHOUT logging in - user must verify email first
+    // Return success WITHOUT logging in - user must verify OTP first
     res.status(201).json({
       success: true,
-      message: 'Registration successful! Please check your email to verify your account before logging in.',
+      message: 'Registration successful! Please enter the OTP sent to your email.',
       requiresVerification: true,
-      email: user.email
+      email: user.email,
+      // In development, return OTP for testing
+      ...(emailResult.development && { devOtp: otp })
     });
   } catch (error) {
     console.error('Registration error:', error);
     res.status(500).json({
       success: false,
       message: error.message || 'Registration failed'
+    });
+  }
+};
+
+/**
+ * @route   POST /api/auth/verify-otp
+ * @desc    Verify OTP and complete registration
+ * @access  Public
+ */
+export const verifyOTP = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    // Validate input
+    if (!email || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide email and OTP'
+      });
+    }
+
+    // Find user by email
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Check if already verified
+    if (user.isVerified) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email already verified. Please login.'
+      });
+    }
+
+    // Check OTP validity
+    if (!user.otp || user.otp !== otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid OTP'
+      });
+    }
+
+    // Check OTP expiration
+    if (user.otpExpires && Date.now() > user.otpExpires) {
+      return res.status(400).json({
+        success: false,
+        message: 'OTP has expired. Please register again.'
+      });
+    }
+
+    // Verify user and clear OTP
+    user.isVerified = true;
+    user.otp = undefined;
+    user.otpExpires = undefined;
+    await user.save();
+
+    // Generate token and return user data
+    const token = generateToken(user._id, user.role);
+
+    res.status(200).json({
+      success: true,
+      message: 'Email verified successfully!',
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error('OTP verification error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'OTP verification failed'
     });
   }
 };

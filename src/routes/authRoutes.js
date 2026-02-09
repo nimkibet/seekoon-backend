@@ -1,5 +1,5 @@
 import express from 'express';
-import { register, login, getMe, unifiedAuth, updateProfile, forgotPassword, resetPassword, verifyEmail, resendVerificationEmail } from '../controllers/authController.js';
+import { register, login, getMe, unifiedAuth, updateProfile, forgotPassword, resetPassword, verifyEmail, resendVerificationEmail, verifyOTP } from '../controllers/authController.js';
 import { authMiddleware } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -13,6 +13,11 @@ router.post('/unified', unifiedAuth);
 // @desc    Register new user
 // @access  Public
 router.post('/register', register);
+
+// @route   POST /api/auth/verify-otp
+// @desc    Verify OTP and complete registration
+// @access  Public
+router.post('/verify-otp', verifyOTP);
 
 // @route   POST /api/auth/login
 // @desc    Login user
