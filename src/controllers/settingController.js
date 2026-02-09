@@ -40,3 +40,33 @@ export const updateFlashSaleSettings = async (req, res) => {
     res.status(500).json({ message: 'Error updating settings', error: error.message });
   }
 };
+
+// GET Home Page Settings
+export const getHomeSettings = async (req, res) => {
+  try {
+    const settings = await Setting.findOne({ key: 'homePage' });
+    const defaults = {
+      heroVideoUrl: "https://res.cloudinary.com/demo/video/upload/v1689264426/running_shoes_promo.mp4",
+      heroHeading: "STEP INTO THE FUTURE",
+      heroSubtitle: "Discover the latest drops from Nike, Adidas, Jordan, and more."
+    };
+    res.status(200).json(settings ? settings.value : defaults);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error fetching home settings' });
+  }
+};
+
+// UPDATE Home Page Settings
+export const updateHomeSettings = async (req, res) => {
+  const { heroVideoUrl, heroHeading, heroSubtitle } = req.body;
+  try {
+    const settings = await Setting.findOneAndUpdate(
+      { key: 'homePage' },
+      { key: 'homePage', value: { heroVideoUrl, heroHeading, heroSubtitle } },
+      { new: true, upsert: true }
+    );
+    res.status(200).json(settings.value);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error updating home settings' });
+  }
+};
