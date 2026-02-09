@@ -45,12 +45,19 @@ export const updateFlashSaleSettings = async (req, res) => {
 export const getHomeSettings = async (req, res) => {
   try {
     const settings = await Setting.findOne({ key: 'homePage' });
+    // Default values for a new setup
     const defaults = {
       heroVideoUrl: "https://res.cloudinary.com/demo/video/upload/v1689264426/running_shoes_promo.mp4",
       heroHeading: "STEP INTO THE FUTURE",
-      heroSubtitle: "Discover the latest drops from Nike, Adidas, Jordan, and more."
+      heroSubtitle: "Discover the latest drops from Nike, Adidas, Jordan, and more.",
+      heroOverlayOpacity: 50, // 0-100%
+      heroHeight: 85, // 50-100vh
+      heroHeadingSize: "large", // small, medium, large, xlarge
+      showHeroBadge: true // boolean
     };
-    res.status(200).json(settings ? settings.value : defaults);
+    
+    // Merge saved settings with defaults to ensure all fields exist
+    res.status(200).json(settings ? { ...defaults, ...settings.value } : defaults);
   } catch (error) {
     res.status(500).json({ message: 'Server error fetching home settings' });
   }
@@ -58,11 +65,13 @@ export const getHomeSettings = async (req, res) => {
 
 // UPDATE Home Page Settings
 export const updateHomeSettings = async (req, res) => {
-  const { heroVideoUrl, heroHeading, heroSubtitle } = req.body;
+  // Destructure all possible fields
+  const { heroVideoUrl, heroHeading, heroSubtitle, heroOverlayOpacity, heroHeight, heroHeadingSize, showHeroBadge } = req.body;
+
   try {
     const settings = await Setting.findOneAndUpdate(
       { key: 'homePage' },
-      { key: 'homePage', value: { heroVideoUrl, heroHeading, heroSubtitle } },
+      { key: 'homePage', value: { heroVideoUrl, heroHeading, heroSubtitle, heroOverlayOpacity, heroHeight, heroHeadingSize, showHeroBadge } },
       { new: true, upsert: true }
     );
     res.status(200).json(settings.value);
