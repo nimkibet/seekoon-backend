@@ -125,14 +125,19 @@ export const createProduct = async (req, res) => {
   try {
     const product = await Product.create(req.body);
 
-    // Log action
-    await SystemLog.create({
-      action: 'product_created',
-      actor: req.user?.email || 'system',
-      actorType: 'admin',
-      details: { productId: product._id },
-      module: 'product'
-    });
+    // Log action - with error handling to prevent crashes
+    try {
+      await SystemLog.create({
+        action: 'product_created',
+        actor: req.user?.email || 'system',
+        actorType: 'admin',
+        details: { productId: product._id },
+        module: 'product'
+      });
+    } catch (logError) {
+      console.error('Failed to create product log:', logError.message);
+      // Continue without crashing - product was created successfully
+    }
 
     res.status(201).json({
       success: true,
@@ -178,14 +183,19 @@ export const updateProduct = async (req, res) => {
       });
     }
 
-    // Log action
-    await SystemLog.create({
-      action: 'product_updated',
-      actor: req.user?.email || 'system',
-      actorType: 'admin',
-      details: { productId: product._id },
-      module: 'product'
-    });
+    // Log action - with error handling to prevent crashes
+    try {
+      await SystemLog.create({
+        action: 'product_updated',
+        actor: req.user?.email || 'system',
+        actorType: 'admin',
+        details: { productId: product._id },
+        module: 'product'
+      });
+    } catch (logError) {
+      console.error('Failed to create product update log:', logError.message);
+      // Continue without crashing - product was updated successfully
+    }
 
     res.status(200).json({
       success: true,
@@ -213,14 +223,19 @@ export const deleteProduct = async (req, res) => {
       });
     }
 
-    // Log action
-    await SystemLog.create({
-      action: 'product_deleted',
-      actor: req.user?.email || 'system',
-      actorType: 'admin',
-      details: { productId: req.params.id },
-      module: 'product'
-    });
+    // Log action - with error handling to prevent crashes
+    try {
+      await SystemLog.create({
+        action: 'product_deleted',
+        actor: req.user?.email || 'system',
+        actorType: 'admin',
+        details: { productId: req.params.id },
+        module: 'product'
+      });
+    } catch (logError) {
+      console.error('Failed to create product delete log:', logError.message);
+      // Continue without crashing - product was deleted successfully
+    }
 
     res.status(200).json({
       success: true,
