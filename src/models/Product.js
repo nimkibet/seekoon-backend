@@ -83,6 +83,10 @@ const productSchema = new mongoose.Schema({
       ref: 'User',
       required: true
     },
+    userName: {
+      type: String,
+      default: 'Anonymous'
+    },
     rating: {
       type: Number,
       required: true,

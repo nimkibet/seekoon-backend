@@ -251,6 +251,158 @@ export const deleteProduct = async (req, res) => {
   }
 };
 
+// Check if user can review a product (must have purchased it)
+export const canUserReview = async (req, res) => {
+  try {
+    const productId = req.params.id;
+    const userId = req.user._id;
+
+    // Check if user already reviewed this product
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Product not found' 
+      });
+    }
+
+    // Check if user already reviewed
+    const alreadyReviewed = product.reviewDetails?.find(
+      r => r.user?.toString() === userId.toString()
+    );
+    if (alreadyReviewed) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'You have already reviewed this product',
+        canReview: false
+      });
+    }
+
+    // VERIFY PURCHASE: Check if user actually bought this product
+    const hasBought = await Order.findOne({
+      user: userId,
+      isPaid: true,
+      $or: [
+        { 'orderItems.product': productId },
+        { 'orderItems': { $elemMatch: { productId: productId } } }
+      ]
+    });
+
+    if (!hasBought) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'You must purchase this product to leave a review',
+        canReview: false,
+        verifiedBuyer: false
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      canReview: true,
+      verifiedBuyer: true,
+      message: 'You can review this product'
+    });
+  } catch (error) {
+    console.error('Error checking review eligibility:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to check review eligibility' 
+    });
+  }
+};
+
+// Add a review to a product
+export const addReview = async (req, res) => {
+  try {
+    const { rating, comment } = req.body;
+    const productId = req.params.id;
+    const userId = req.user._id;
+    const userName = req.user.name || req.user.email;
+
+    // Validate input
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Rating must be between 1 and 5 stars' 
+      });
+    }
+
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Product not found' 
+      });
+    }
+
+    // Check if user already reviewed
+    const alreadyReviewed = product.reviewDetails?.find(
+      r => r.user?.toString() === userId.toString()
+    );
+    if (alreadyReviewed) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'You have already reviewed this product' 
+      });
+    }
+
+    // VERIFY PURCHASE: Check if user actually bought this product
+    const hasBought = await Order.findOne({
+      user: userId,
+      isPaid: true,
+      $or: [
+        { 'orderItems.product': productId },
+        { 'orderItems': { $elemMatch: { productId: productId } } }
+      ]
+    });
+
+    if (!hasBought) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'You must purchase this product to leave a review. Only verified buyers can review products.' 
+      });
+    }
+
+    // Create review object
+    const review = {
+      user: userId,
+      userName: userName,
+      rating: Number(rating),
+      comment: comment || '',
+      isVerifiedPurchase: true, // Mark as verified since they purchased
+      createdAt: new Date()
+    };
+
+    // Initialize reviewDetails array if it doesn't exist
+    if (!product.reviewDetails) {
+      product.reviewDetails = [];
+    }
+
+    // Add review to product
+    product.reviewDetails.push(review);
+
+    // Calculate new average rating
+    const totalRating = product.reviewDetails.reduce((sum, r) => sum + r.rating, 0);
+    product.rating = totalRating / product.reviewDetails.length;
+    product.reviews = product.reviewDetails.length;
+
+    await product.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Review added successfully',
+      review: review
+    });
+  } catch (error) {
+    console.error('Error adding review:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to add review' 
+    });
+  }
+};
+
 
 
 
