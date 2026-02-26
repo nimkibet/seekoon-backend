@@ -1,6 +1,64 @@
 import Order from '../models/Order.js';
 import SystemLog from '../models/SystemLog.js';
 
+// Create Order
+export const createOrder = async (req, res) => {
+  try {
+    const {
+      items,
+      totalAmount,
+      paymentMethod,
+      shippingAddress,
+      deliveryDate,
+      convenientTime
+    } = req.body;
+
+    // Get user from auth middleware
+    const userId = req.user?._id || req.user?.id;
+    const userEmail = req.user?.email;
+
+    if (!items || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No items in order'
+      });
+    }
+
+    const order = await Order.create({
+      user: userId,
+      userEmail: userEmail || shippingAddress?.firstName + ' ' + shippingAddress?.lastName,
+      items: items.map(item => ({
+        product: item.id,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        image: item.image,
+        size: item.size,
+        color: item.color
+      })),
+      totalAmount: totalAmount || 0,
+      paymentMethod: paymentMethod || 'M-Pesa',
+      shippingAddress,
+      deliveryDate,
+      convenientTime,
+      status: 'pending',
+      isPaid: false
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Order created successfully',
+      order
+    });
+  } catch (error) {
+    console.error('Error creating order:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create order'
+    });
+  }
+};
+
 // Get All Orders (Admin)
 export const getAllOrders = async (req, res) => {
   try {
