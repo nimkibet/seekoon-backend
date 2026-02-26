@@ -77,7 +77,6 @@ const productSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-<<<<<<< HEAD
   reviewDetails: [{
     user: {
       type: mongoose.Schema.Types.ObjectId,
@@ -107,8 +106,7 @@ const productSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
-=======
->>>>>>> 9de8a30e5d2d5f4909bc14d2509e3d3b34282613
+
   newProduct: {
     type: Boolean,
     default: false

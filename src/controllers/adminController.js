@@ -7,7 +7,6 @@ import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'seekon_secret_key';
 
-<<<<<<< HEAD
 // Get Admin Stats - Real business metrics
 export const getAdminStats = async (req, res) => {
   try {
@@ -84,8 +83,6 @@ export const getAdminStats = async (req, res) => {
   }
 };
 
-=======
->>>>>>> 9de8a30e5d2d5f4909bc14d2509e3d3b34282613
 // Admin Login
 export const adminLogin = async (req, res) => {
   try {
