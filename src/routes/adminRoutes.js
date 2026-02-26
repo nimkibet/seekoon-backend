@@ -1,10 +1,7 @@
 import express from 'express';
 import {
   adminLogin,
-<<<<<<< HEAD
   getAdminStats,
-=======
->>>>>>> 9de8a30e5d2d5f4909bc14d2509e3d3b34282613
   getDashboardStats,
   getAllTransactions,
   getTransaction,
@@ -37,12 +34,8 @@ const router = express.Router();
 router.post('/login', adminLogin);
 
 // Protected routes - require authentication
-<<<<<<< HEAD
 router.get('/stats', authMiddleware, adminMiddleware, getAdminStats);
 router.get('/dashboard', authMiddleware, getDashboardStats);
-=======
-router.get('/stats', authMiddleware, getDashboardStats);
->>>>>>> 9de8a30e5d2d5f4909bc14d2509e3d3b34282613
 router.get('/transactions', authMiddleware, getAllTransactions);
 router.get('/transactions/:id', authMiddleware, getTransaction);
 router.get('/transactions/export/csv', authMiddleware, exportTransactions);
