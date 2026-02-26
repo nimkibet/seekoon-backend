@@ -24,8 +24,8 @@ export const createOrder = async (req, res) => {
       });
     }
 
-    // Normalize paymentMethod to lowercase
-    const normalizedPaymentMethod = paymentMethod?.toLowerCase() || 'mpesa';
+    // Keep the original paymentMethod format from frontend - don't normalize
+    const normalizedPaymentMethod = paymentMethod || 'M-Pesa';
 
     // Map shippingAddress fields to match model
     const mappedShippingAddress = shippingAddress ? {

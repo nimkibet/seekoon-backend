@@ -30,7 +30,7 @@ const orderSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['M-Pesa', 'Card', 'Flutterwave'],
+    enum: ['M-Pesa', 'Card', 'Flutterwave', 'm-pesa', 'card', 'flutterwave'],
     default: 'M-Pesa'
   },
   paymentReference: {
