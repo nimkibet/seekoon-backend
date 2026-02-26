@@ -7,6 +7,82 @@ import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'seekon_secret_key';
 
+// Get Admin Stats - Real business metrics
+export const getAdminStats = async (req, res) => {
+  try {
+    // Get counts for users, products, and orders
+    const [totalUsers, totalOrders, productCount] = await Promise.all([
+      User.countDocuments({}),
+      Order.countDocuments({}),
+      Product.countDocuments()
+    ]);
+    
+    // Calculate total revenue (sum of totalAmount where isPaid is true)
+    const paidOrders = await Order.find({ isPaid: true });
+    const totalRevenue = paidOrders.reduce((acc, order) => acc + order.totalAmount, 0);
+    
+    // Get recent orders for dashboard
+    const recentOrders = await Order.find()
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .populate('user', 'name email');
+    
+    // Get top products
+    const topProducts = await Product.find()
+      .sort({ sold: -1 })
+      .limit(5);
+    
+    // Get recent users for activities
+    const recentUsers = await User.find()
+      .sort({ createdAt: -1 })
+      .limit(3);
+    
+    res.status(200).json({
+      success: true,
+      stats: {
+        today: { revenue: 0, successful: 0, failed: 0, pending: 0, orders: 0, newUsers: 0 },
+        total: {
+          revenue: totalRevenue,
+          successful: 0,
+          failed: 0,
+          pending: 0,
+          users: totalUsers,
+          products: productCount,
+          orders: totalOrders
+        },
+        weeklyRevenue: []
+      },
+      recentOrders: recentOrders.map(order => ({
+        id: order._id,
+        customer: order.user?.name || order.guestName || 'Guest',
+        amount: order.totalAmount,
+        status: order.status,
+        date: new Date(order.createdAt).toLocaleDateString(),
+        paymentMethod: order.paymentMethod || 'M-Pesa'
+      })),
+      topProducts: topProducts.map(product => ({
+        id: product._id,
+        name: product.name,
+        sold: product.sold || 0,
+        revenue: (product.sold || 0) * product.price,
+        category: product.category
+      })),
+      recentActivities: recentUsers.map(user => ({
+        type: 'user',
+        message: `New user registered: ${user.name}`,
+        time: new Date(user.createdAt).toLocaleDateString(),
+        icon: '👤'
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching admin stats:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to fetch admin stats' 
+    });
+  }
+};
+
 // Admin Login
 export const adminLogin = async (req, res) => {
   try {

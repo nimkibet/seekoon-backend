@@ -1,6 +1,7 @@
 import express from 'express';
 import {
   adminLogin,
+  getAdminStats,
   getDashboardStats,
   getAllTransactions,
   getTransaction,
@@ -33,7 +34,8 @@ const router = express.Router();
 router.post('/login', adminLogin);
 
 // Protected routes - require authentication
-router.get('/stats', authMiddleware, getDashboardStats);
+router.get('/stats', authMiddleware, adminMiddleware, getAdminStats);
+router.get('/dashboard', authMiddleware, getDashboardStats);
 router.get('/transactions', authMiddleware, getAllTransactions);
 router.get('/transactions/:id', authMiddleware, getTransaction);
 router.get('/transactions/export/csv', authMiddleware, exportTransactions);
