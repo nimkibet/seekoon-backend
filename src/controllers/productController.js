@@ -1,9 +1,6 @@
 import Product from '../models/Product.js';
 import SystemLog from '../models/SystemLog.js';
-<<<<<<< HEAD
 import Order from '../models/Order.js';
-=======
->>>>>>> 9de8a30e5d2d5f4909bc14d2509e3d3b34282613
 
 // Helper function to calculate active price based on flash sale timing
 const calculateActivePrice = (product) => {
@@ -254,7 +251,6 @@ export const deleteProduct = async (req, res) => {
   }
 };
 
-<<<<<<< HEAD
 // Check if user can review a product (must have purchased it)
 export const canUserReview = async (req, res) => {
   try {
@@ -406,9 +402,6 @@ export const addReview = async (req, res) => {
     });
   }
 };
-
-=======
->>>>>>> 9de8a30e5d2d5f4909bc14d2509e3d3b34282613
 
 
 
