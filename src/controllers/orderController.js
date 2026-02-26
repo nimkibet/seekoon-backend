@@ -40,7 +40,7 @@ export const createOrder = async (req, res) => {
       user: userId, // Can be null for guest checkout
       userEmail: userEmail,
       items: items.map(item => ({
-        product: item.id,
+        product: item.product || item.id || item._id, // Use product field if available, fallback to id or _id
         name: item.name,
         price: item.price,
         quantity: item.quantity,

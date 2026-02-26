@@ -8,13 +8,13 @@ const orderSchema = new mongoose.Schema({
   },
   userEmail: {
     type: String,
-    required: true
+    required: false
   },
   items: [{
     product: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Product',
-      required: true
+      required: false // Optional - may not have valid ID for cart items
     },
     name: String,
     price: Number,
@@ -25,12 +25,13 @@ const orderSchema = new mongoose.Schema({
   }],
   totalAmount: {
     type: Number,
-    required: true
+    required: false,
+    default: 0
   },
   paymentMethod: {
     type: String,
-    enum: ['mpesa', 'card', 'flutterwave'],
-    required: true
+    enum: ['M-Pesa', 'Card', 'Flutterwave'],
+    default: 'M-Pesa'
   },
   paymentReference: {
     type: String
