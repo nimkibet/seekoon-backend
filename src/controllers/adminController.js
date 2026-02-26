@@ -37,6 +37,52 @@ export const getAdminStats = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(3);
     
+    // 1. Calculate Monthly Sales (Group paid orders by month)
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    // Get current year
+    const currentYear = new Date().getFullYear();
+    
+    // Monthly sales aggregation
+    const monthlySalesRaw = await Order.aggregate([
+      { $match: { isPaid: true, createdAt: { $gte: new Date(`${currentYear}-01-01`) } } },
+      { $group: { _id: { $month: '$createdAt' }, revenue: { $sum: '$totalAmount' } } },
+      { $sort: { '_id': 1 } }
+    ]);
+    
+    const monthlySales = monthlySalesRaw.map(item => ({
+      name: monthNames[item._id - 1] || 'Unknown',
+      sales: item.revenue || 0
+    }));
+    
+    // 2. Sales by Category (Count products by category)
+    const salesByCategoryRaw = await Product.aggregate([
+      { $group: { _id: '$category', value: { $sum: 1 } } }
+    ]);
+    
+    const salesByCategory = salesByCategoryRaw.map(item => ({
+      name: item._id || 'Uncategorized',
+      value: item.value || 0
+    }));
+    
+    // 3. Growth Rate - Simple calculation: compare this month vs last month
+    const now = new Date();
+    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+    
+    const [thisMonthOrders, lastMonthOrders] = await Promise.all([
+      Order.countDocuments({ isPaid: true, createdAt: { $gte: thisMonthStart } }),
+      Order.countDocuments({ isPaid: true, createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd } })
+    ]);
+    
+    let growthRate = 0;
+    if (lastMonthOrders > 0) {
+      growthRate = ((thisMonthOrders - lastMonthOrders) / lastMonthOrders * 100).toFixed(1);
+    } else if (thisMonthOrders > 0) {
+      growthRate = 100; // First month with orders
+    }
+    
     res.status(200).json({
       success: true,
       stats: {
@@ -50,7 +96,10 @@ export const getAdminStats = async (req, res) => {
           products: productCount,
           orders: totalOrders
         },
-        weeklyRevenue: []
+        weeklyRevenue: [],
+        monthlySales: monthlySales,
+        salesByCategory: salesByCategory,
+        growthRate: parseFloat(growthRate)
       },
       recentOrders: recentOrders.map(order => ({
         id: order._id,
