@@ -13,9 +13,9 @@ export const createOrder = async (req, res) => {
       convenientTime
     } = req.body;
 
-    // Get user from auth middleware
-    const userId = req.user?._id || req.user?.id;
-    const userEmail = req.user?.email;
+    // Get user from auth middleware (optional - can be guest checkout)
+    const userId = req.user?._id || req.user?.id || null;
+    const userEmail = req.user?.email || shippingAddress?.email || 'guest@seekon.com';
 
     if (!items || items.length === 0) {
       return res.status(400).json({
@@ -24,9 +24,21 @@ export const createOrder = async (req, res) => {
       });
     }
 
+    // Normalize paymentMethod to lowercase
+    const normalizedPaymentMethod = paymentMethod?.toLowerCase() || 'mpesa';
+
+    // Map shippingAddress fields to match model
+    const mappedShippingAddress = shippingAddress ? {
+      name: `${shippingAddress.firstName || ''} ${shippingAddress.lastName || ''}`.trim(),
+      phone: shippingAddress.phone,
+      address: shippingAddress.address,
+      city: shippingAddress.city,
+      postalCode: shippingAddress.zipCode
+    } : {};
+
     const order = await Order.create({
-      user: userId,
-      userEmail: userEmail || shippingAddress?.firstName + ' ' + shippingAddress?.lastName,
+      user: userId, // Can be null for guest checkout
+      userEmail: userEmail,
       items: items.map(item => ({
         product: item.id,
         name: item.name,
@@ -37,8 +49,8 @@ export const createOrder = async (req, res) => {
         color: item.color
       })),
       totalAmount: totalAmount || 0,
-      paymentMethod: paymentMethod || 'M-Pesa',
-      shippingAddress,
+      paymentMethod: normalizedPaymentMethod,
+      shippingAddress: mappedShippingAddress,
       deliveryDate,
       convenientTime,
       status: 'pending',
