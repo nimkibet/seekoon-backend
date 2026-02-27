@@ -40,6 +40,7 @@ export const uploadToCloudinary = async (filePath, folder = 'seekon-apparel') =>
     const result = await cloudinary.uploader.upload(filePath, {
       folder,
       resource_type: 'auto',
+      background_removal: 'cloudinary_ai',
     });
     return {
       url: result.secure_url,
@@ -66,6 +67,7 @@ export const uploadBufferToCloudinary = async (fileBuffer, folder = 'seekon-appa
       {
         folder,
         resource_type: 'auto',
+        background_removal: 'cloudinary_ai',
       },
       (error, result) => {
         if (error) {
