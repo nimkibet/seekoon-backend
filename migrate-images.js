@@ -25,12 +25,17 @@ cloudinary.config({
 const mongooseOptions = {
   serverSelectionTimeoutMS: 30000,
   socketTimeoutMS: 45000,
+  tls: true,
+  tlsAllowInvalidCertificates: true,
 };
 
 // Import Product model
 import('./src/models/Product.js').then(module => {
   const Product = module.default;
   runMigration(Product);
+}).catch(err => {
+  console.error('Failed to import Product model:', err);
+  process.exit(1);
 });
 
 /**
@@ -107,8 +112,36 @@ const runMigration = async (Product) => {
   try {
     // Connect to the live database
     console.log('Connecting to MongoDB...');
-    await mongoose.connect(process.env.MONGO_URI, mongooseOptions);
-    console.log('🟢 Connected to MongoDB');
+    console.log('MONGO_URI:', process.env.MONGO_URI ? 'Set (hidden for security)' : 'NOT SET');
+    
+    let mongoUri = process.env.MONGO_URI;
+    let connected = false;
+    
+    // Try with current connection string first
+    try {
+      await mongoose.connect(mongoUri, {
+        serverSelectionTimeoutMS: 15000,
+        socketTimeoutMS: 30000,
+      });
+      connected = true;
+      console.log('🟢 Connected to MongoDB');
+    } catch (firstError) {
+      console.log('First connection attempt failed:', firstError.message);
+      
+      // Try fallback: convert mongodb+srv to mongodb
+      if (mongoUri.includes('mongodb+srv://')) {
+        console.log('Trying standard MongoDB connection (non-SRV)...');
+        const standardUri = mongoUri.replace('mongodb+srv://', 'mongodb://');
+        await mongoose.connect(standardUri, {
+          serverSelectionTimeoutMS: 15000,
+          socketTimeoutMS: 30000,
+        });
+        connected = true;
+        console.log('🟢 Connected to MongoDB via standard connection');
+      } else {
+        throw firstError;
+      }
+    }
     
     // Fetch all products
     const products = await Product.find({});
