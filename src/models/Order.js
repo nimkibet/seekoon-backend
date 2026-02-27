@@ -67,6 +67,14 @@ const orderSchema = new mongoose.Schema({
     city: String,
     postalCode: String
   },
+  shippingPrice: {
+    type: Number,
+    default: 0
+  },
+  shippingMethod: {
+    type: String,
+    default: ''
+  },
   notes: {
     type: String
   }
