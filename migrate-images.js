@@ -21,6 +21,12 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+// MongoDB Connection Options
+const mongooseOptions = {
+  serverSelectionTimeoutMS: 30000,
+  socketTimeoutMS: 45000,
+};
+
 // Import Product model
 import('./src/models/Product.js').then(module => {
   const Product = module.default;
@@ -100,7 +106,8 @@ const runMigration = async (Product) => {
   
   try {
     // Connect to the live database
-    await mongoose.connect(process.env.MONGO_URI);
+    console.log('Connecting to MongoDB...');
+    await mongoose.connect(process.env.MONGO_URI, mongooseOptions);
     console.log('🟢 Connected to MongoDB');
     
     // Fetch all products
