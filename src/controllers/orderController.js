@@ -14,7 +14,8 @@ export const createOrder = async (req, res) => {
     } = req.body;
 
     // Get user from auth middleware (optional - can be guest checkout)
-    const userId = req.user?._id || req.user?.id || null;
+    // JWT token contains userId, so we check all possible field names
+    const userId = req.user?.userId || req.user?._id || req.user?.id || null;
     const userEmail = req.user?.email || shippingAddress?.email || 'guest@seekon.com';
 
     if (!items || items.length === 0) {
@@ -118,7 +119,8 @@ export const getAllOrders = async (req, res) => {
 // Get Current User's Orders
 export const getMyOrders = async (req, res) => {
   try {
-    const userId = req.user?._id || req.user?.id;
+    // JWT token contains userId, so we check all possible field names
+    const userId = req.user?.userId || req.user?._id || req.user?.id;
     
     if (!userId) {
       return res.status(401).json({
