@@ -57,7 +57,7 @@ const orderSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'processing', 'completed', 'cancelled', 'refunded'],
+    enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'],
     default: 'pending'
   },
   shippingAddress: {
@@ -76,6 +76,12 @@ const orderSchema = new mongoose.Schema({
     default: ''
   },
   notes: {
+    type: String
+  },
+  expectedArrival: {
+    type: String
+  },
+  deliveryDetails: {
     type: String
   }
 }, {

@@ -171,16 +171,22 @@ export const getOrder = async (req, res) => {
   }
 };
 
-// Update Order Status
+// Update Order Status & Fulfillment Details
 export const updateOrderStatus = async (req, res) => {
   try {
-    const { status } = req.body;
+    const { status, expectedArrival, deliveryDetails } = req.body;
+
+    // Build update object dynamically
+    const updateData = {};
+    if (status) updateData.status = status;
+    if (expectedArrival !== undefined) updateData.expectedArrival = expectedArrival;
+    if (deliveryDetails !== undefined) updateData.deliveryDetails = deliveryDetails;
 
     const order = await Order.findByIdAndUpdate(
       req.params.id,
-      { status },
+      updateData,
       { new: true }
-    ).populate('user', 'name email');
+    ).populate('user', 'name email phone');
 
     if (!order) {
       return res.status(404).json({

@@ -1,5 +1,5 @@
 import express from 'express';
-import { getMyOrders, getOrder, createOrder } from '../controllers/orderController.js';
+import { getMyOrders, getOrder, createOrder, updateOrderStatus } from '../controllers/orderController.js';
 import { authMiddleware } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -12,5 +12,8 @@ router.get('/myorders', authMiddleware, getMyOrders);
 
 // Get single order by ID (public for payment polling)
 router.get('/:id', getOrder);
+
+// Update order status/fulfillment (admin)
+router.patch('/:id', updateOrderStatus);
 
 export default router;
