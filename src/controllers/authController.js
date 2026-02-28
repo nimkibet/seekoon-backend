@@ -13,19 +13,103 @@ const generateToken = (userId, role = 'user') => {
 };
 
 /**
+ * @route   POST /api/auth/send-code
+ * @desc    Send verification code to email (for inline verification)
+ * @access  Public
+ */
+export const sendVerificationCode = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    // Validate input
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required'
+      });
+    }
+
+    // Email validation
+    const emailRegex = /\S+@\S+\.\S+/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid email format'
+      });
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: 'User already exists with this email'
+      });
+    }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Store OTP temporarily in a cache (in-memory for this implementation)
+    // For production, consider using Redis or a separate OTP collection
+    if (!global.pendingRegistrations) {
+      global.pendingRegistrations = new Map();
+    }
+    
+    // Store OTP with 15 minute expiration
+    global.pendingRegistrations.set(email, {
+      otp,
+      expiresAt: Date.now() + 15 * 60 * 1000
+    });
+
+    // Send OTP email
+    const emailResult = await sendOTPEmail(email, otp);
+    if (!emailResult.success) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to send verification email'
+      });
+    }
+
+    // Return success
+    res.status(200).json({
+      success: true,
+      message: 'Verification code sent to your email',
+      // In development, return OTP for testing
+      ...(emailResult.development && { devOtp: otp })
+    });
+  } catch (error) {
+    console.error('Send verification code error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to send verification code'
+    });
+  }
+};
+
+/**
  * @route   POST /api/auth/register
- * @desc    Register new user (OTP verification)
+ * @desc    Register new user (with inline OTP verification)
  * @access  Public
  */
 export const register = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, verificationCode } = req.body;
 
     // Validate input
-    if (!name || !email || !password) {
+    if (!name || !email || !password || !verificationCode) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide all fields'
+        message: 'Please provide all fields including verification code'
+      });
+    }
+
+    // Email validation
+    const emailRegex = /\S+@\S+\.\S+/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid email format'
       });
     }
 
@@ -58,16 +142,7 @@ export const register = async (req, res) => {
       });
     }
 
-    // Email validation
-    const emailRegex = /\S+@\S+\.\S+/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid email format'
-      });
-    }
-
-    // Check if user exists
+    // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({
@@ -76,33 +151,63 @@ export const register = async (req, res) => {
       });
     }
 
-    // Create user (unverified)
+    // Validate verification code
+    if (!global.pendingRegistrations) {
+      return res.status(400).json({
+        success: false,
+        message: 'No verification code found. Please request a new code.'
+      });
+    }
+
+    const pendingRegistration = global.pendingRegistrations.get(email.toLowerCase());
+    if (!pendingRegistration) {
+      return res.status(400).json({
+        success: false,
+        message: 'No verification code found. Please request a new code.'
+      });
+    }
+
+    // Check if OTP has expired
+    if (Date.now() > pendingRegistration.expiresAt) {
+      global.pendingRegistrations.delete(email.toLowerCase());
+      return res.status(400).json({
+        success: false,
+        message: 'Verification code has expired. Please request a new one.'
+      });
+    }
+
+    // Validate OTP
+    if (pendingRegistration.otp !== verificationCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid verification code'
+      });
+    }
+
+    // Clear the pending registration after successful verification
+    global.pendingRegistrations.delete(email.toLowerCase());
+
+    // Create user (verified)
     const user = await User.create({
       name,
       email,
-      password
+      password,
+      isVerified: true
     });
 
-    // Generate 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    user.otp = otp;
-    user.otpExpires = Date.now() + 15 * 60 * 1000; // 15 minutes
-    await user.save();
+    // Generate token
+    const token = generateToken(user._id, user.role);
 
-    // Send OTP email
-    const emailResult = await sendOTPEmail(user.email, otp);
-    if (!emailResult.success) {
-      console.error('Failed to send OTP email:', emailResult.message);
-    }
-
-    // Return success WITHOUT logging in - user must verify OTP first
     res.status(201).json({
       success: true,
-      message: 'Registration successful! Please enter the OTP sent to your email.',
-      requiresVerification: true,
-      email: user.email,
-      // In development, return OTP for testing
-      ...(emailResult.development && { devOtp: otp })
+      message: 'Account created successfully!',
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
     });
   } catch (error) {
     console.error('Registration error:', error);

@@ -1,8 +1,13 @@
 import express from 'express';
-import { register, login, getMe, unifiedAuth, updateProfile, forgotPassword, resetPassword, verifyEmail, resendVerificationEmail, verifyOTP } from '../controllers/authController.js';
+import { register, login, getMe, unifiedAuth, updateProfile, forgotPassword, resetPassword, verifyEmail, resendVerificationEmail, verifyOTP, sendVerificationCode } from '../controllers/authController.js';
 import { authMiddleware } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// @route   POST /api/auth/send-code
+// @desc    Send verification code to email
+// @access  Public
+router.post('/send-code', sendVerificationCode);
 
 // @route   POST /api/auth/unified
 // @desc    Unified login/register - auto-detects new users and signs them up
