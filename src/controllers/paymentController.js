@@ -142,7 +142,10 @@ export const initiateMpesaPayment = async (req, res) => {
 
     // STK Push request
     const shortcode = process.env.SHORTCODE || process.env.DARAJA_BUSINESS_SHORTCODE || process.env.MPESA_SHORTCODE;
-    const callbackURL = process.env.CALLBACK_URL || process.env.MPESA_CALLBACK_URL || 'https://seekoon-backend-production.up.railway.app/api/payment/mpesa-callback';
+    
+    // HARDCODED: Force callback URL to production Railway endpoint
+    const CallBackURL = 'https://seekoon-backend-production.up.railway.app/api/payment/mpesa-callback';
+    console.log('🎯 Using CallBackURL:', CallBackURL);
 
     // Determine base URL based on environment
     const stkPushUrl = isSandbox
@@ -161,15 +164,18 @@ export const initiateMpesaPayment = async (req, res) => {
       PartyA: formattedPhone,
       PartyB: shortcode,
       PhoneNumber: formattedPhone,
-      CallBackURL: `${callbackURL}/api/payment/mpesa-callback`,
+      CallBackURL: CallBackURL,
       AccountReference: reference,
       TransactionDesc: 'Seekon Apparel Purchase'
     };
+
+    console.log('🚀 Payload being sent to Safaricom:', JSON.stringify(stkPushData, null, 2));
 
     console.log('📤 Sending STK Push request:', {
       phone: formattedPhone,
       amount: amountForSTK,
       reference,
+      callbackURL: CallBackURL,
       environment: isSandbox ? 'sandbox' : 'production'
     });
 
