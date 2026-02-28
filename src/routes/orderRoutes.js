@@ -8,7 +8,7 @@ const router = express.Router();
 router.post('/', authMiddleware, createOrder);
 
 // Get current user's orders (requires authentication)
-router.get('/myorders', authMiddleware, getMyOrders);
+router.get('/my-orders', authMiddleware, getMyOrders);
 
 // Get single order by ID (public for payment polling)
 router.get('/:id', getOrder);
