@@ -23,8 +23,8 @@ const stkLimiter = rateLimit({
 router.post('/mpesa', authMiddleware, stkLimiter, initiateMpesaPayment);
 router.post('/flutterwave', authMiddleware, initiateFlutterwavePayment);
 
-// Callback routes with IP whitelist for security
-router.post('/mpesa-callback', safaricomIpWhitelist, mpesaCallback);
+// Callback routes - removed IP whitelist for Sandbox testing
+router.post('/mpesa-callback', mpesaCallback);
 router.get('/flutterwave-callback', flutterwaveCallback);
 
 router.get('/transactions/:userEmail', authMiddleware, getUserTransactions);
