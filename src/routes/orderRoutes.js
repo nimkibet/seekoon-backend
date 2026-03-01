@@ -1,6 +1,6 @@
 import express from 'express';
-import { getMyOrders, getOrder, createOrder, updateOrderStatus } from '../controllers/orderController.js';
-import { authMiddleware } from '../middleware/auth.js';
+import { getMyOrders, getOrder, createOrder, updateOrderStatus, deleteOrder } from '../controllers/orderController.js';
+import { authMiddleware, adminMiddleware } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -14,6 +14,9 @@ router.get('/my-orders', authMiddleware, getMyOrders);
 router.get('/:id', getOrder);
 
 // Update order status/fulfillment (admin)
-router.patch('/:id', updateOrderStatus);
+router.patch('/:id', authMiddleware, adminMiddleware, updateOrderStatus);
+
+// Delete order (admin only)
+router.delete('/:id', authMiddleware, adminMiddleware, deleteOrder);
 
 export default router;

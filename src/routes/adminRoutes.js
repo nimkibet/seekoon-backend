@@ -28,6 +28,7 @@ import {
   cancelOrder
 } from '../controllers/orderController.js';
 import { authMiddleware, adminMiddleware } from '../middleware/auth.js';
+import Notification from '../models/Notification.js';
 
 const router = express.Router();
 
@@ -153,6 +154,57 @@ router.get('/orders/:id', authMiddleware, getOrder);
 router.patch('/orders/:id/status', authMiddleware, updateOrderStatus);
 router.patch('/orders/:id/cancel', authMiddleware, cancelOrder);
 
+// Notification routes
+router.get('/notifications', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const notifications = await Notification.find()
+      .sort({ createdAt: -1 })
+      .limit(20);
+    
+    const unreadCount = await Notification.countDocuments({ isRead: false });
+    
+    res.status(200).json({
+      success: true,
+      notifications,
+      unreadCount
+    });
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch notifications'
+    });
+  }
+});
+
+router.put('/notifications/:id/read', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const notification = await Notification.findByIdAndUpdate(
+      req.params.id,
+      { isRead: true },
+      { new: true }
+    );
+    
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        message: 'Notification not found'
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      notification
+    });
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to mark notification as read'
+    });
+  }
+});
+
 // Cloudinary management
 router.post('/cloudinary/delete', authMiddleware, async (req, res) => {
   try {
@@ -168,3 +220,4 @@ router.post('/cloudinary/delete', authMiddleware, async (req, res) => {
 });
 
 export default router;
+

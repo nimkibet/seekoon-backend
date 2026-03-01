@@ -1,5 +1,6 @@
 import Order from '../models/Order.js';
 import SystemLog from '../models/SystemLog.js';
+import Notification from '../models/Notification.js';
 
 // Create Order
 export const createOrder = async (req, res) => {
@@ -57,6 +58,18 @@ export const createOrder = async (req, res) => {
       status: 'pending',
       isPaid: false
     });
+
+    // Create admin notification for new order
+    try {
+      await Notification.create({
+        type: 'NEW_ORDER',
+        message: `New order placed for KSh ${order.totalAmount}`,
+        orderId: order._id
+      });
+      console.log('✅ Admin notification created for new order!');
+    } catch (notifError) {
+      console.error('⚠️ Error creating notification:', notifError.message);
+    }
 
     res.status(201).json({
       success: true,
@@ -259,6 +272,37 @@ export const cancelOrder = async (req, res) => {
   }
 };
 
+// Delete Order (Admin only - permanent deletion)
+export const deleteOrder = async (req, res) => {
+  try {
+    const order = await Order.findByIdAndDelete(req.params.id);
 
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
 
+    // Log action
+    await SystemLog.create({
+      action: 'order_deleted',
+      actor: req.admin?.email || 'system',
+      actorType: 'admin',
+      details: { orderId: req.params.id },
+      module: 'order'
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Order deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting order:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete order'
+    });
+  }
+};
 
