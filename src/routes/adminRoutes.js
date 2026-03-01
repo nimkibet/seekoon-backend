@@ -5,7 +5,8 @@ import {
   getDashboardStats,
   getAllTransactions,
   getTransaction,
-  exportTransactions
+  exportTransactions,
+  getAnalytics
 } from '../controllers/adminController.js';
 import {
   getAllUsers,
@@ -35,6 +36,7 @@ router.post('/login', adminLogin);
 
 // Protected routes - require authentication
 router.get('/stats', authMiddleware, adminMiddleware, getAdminStats);
+router.get('/analytics', authMiddleware, adminMiddleware, getAnalytics);
 router.get('/dashboard', authMiddleware, getDashboardStats);
 router.get('/transactions', authMiddleware, getAllTransactions);
 router.get('/transactions/:id', authMiddleware, getTransaction);

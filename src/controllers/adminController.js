@@ -51,21 +51,69 @@ export const getAdminStats = async (req, res) => {
     ]);
     
     const monthlySales = monthlySalesRaw.map(item => ({
-      name: monthNames[item._id - 1] || 'Unknown',
-      sales: item.revenue || 0
+      month: monthNames[item._id - 1] || 'Unknown',
+      value: item.revenue || 0
     }));
     
-    // 2. Sales by Category (Count products by category)
-    const salesByCategoryRaw = await Product.aggregate([
-      { $group: { _id: '$category', value: { $sum: 1 } } }
+    // 2. Sales by Category (Aggregate sold items from orders by category)
+    // First, get all paid orders with their items
+    const paidOrdersWithItems = await Order.find({ isPaid: true }).populate('items.product');
+    
+    // Aggregate by category from order items
+    const categoryMap = {};
+    paidOrdersWithItems.forEach(order => {
+      order.items.forEach(item => {
+        if (item.product && item.product.category) {
+          const cat = item.product.category;
+          categoryMap[cat] = (categoryMap[cat] || 0) + item.quantity;
+        }
+      });
+    });
+    
+    // If no orders yet, fall back to product count by category
+    if (Object.keys(categoryMap).length === 0) {
+      const productCategories = await Product.aggregate([
+        { $group: { _id: '$category', count: { $sum: 1 } } }
+      ]);
+      productCategories.forEach(cat => {
+        categoryMap[cat._id || 'Uncategorized'] = cat.count;
+      });
+    }
+    
+    const salesByCategory = Object.entries(categoryMap).map(([name, value]) => ({
+      name: name || 'Uncategorized',
+      value: value || 0
+    }));
+    
+    // 3. Weekly Revenue (last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    const weeklyRevenueRaw = await Order.aggregate([
+      { $match: { isPaid: true, createdAt: { $gte: sevenDaysAgo } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+          total: { $sum: '$totalAmount' }
+        }
+      },
+      { $sort: { _id: 1 } }
     ]);
     
-    const salesByCategory = salesByCategoryRaw.map(item => ({
-      name: item._id || 'Uncategorized',
-      value: item.value || 0
-    }));
+    // Fill in missing days with zero values
+    const weeklyRevenue = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      const found = weeklyRevenueRaw.find(r => r._id === dateStr);
+      weeklyRevenue.push({
+        _id: dateStr,
+        total: found ? found.total : 0
+      });
+    }
     
-    // 3. Growth Rate - Simple calculation: compare this month vs last month
+    // 4. Growth Rate - Simple calculation: compare this month vs last month
     const now = new Date();
     const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -96,7 +144,7 @@ export const getAdminStats = async (req, res) => {
           products: productCount,
           orders: totalOrders
         },
-        weeklyRevenue: [],
+        weeklyRevenue: weeklyRevenue,
         monthlySales: monthlySales,
         salesByCategory: salesByCategory,
         growthRate: parseFloat(growthRate)
@@ -456,6 +504,100 @@ export const exportTransactions = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to export transactions'
+    });
+  }
+};
+
+// Get Analytics Data - Real data for charts
+export const getAnalytics = async (req, res) => {
+  try {
+    // Fetch all non-cancelled orders
+    const orders = await Order.find({ status: { $ne: 'cancelled' } }).populate('items.product');
+    
+    // Calculate totalRevenue (sum of all totalAmount)
+    const totalRevenue = orders.reduce((acc, order) => acc + (order.totalAmount || 0), 0);
+    
+    // Calculate totalOrders and fetch totalUsers count
+    const totalOrders = orders.length;
+    const totalUsers = await User.countDocuments({});
+    
+    // Revenue Trends: Group orders by createdAt date (last 7 days)
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6); // Include today, go back 6 days
+    
+    // Initialize revenue map for last 7 days
+    const revenueByDay = {};
+    for (let i = 0; i < 7; i++) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      revenueByDay[dateStr] = 0;
+    }
+    
+    // Group orders by date
+    orders.forEach(order => {
+      if (order.createdAt) {
+        const dateStr = order.createdAt.toISOString().split('T')[0];
+        if (revenueByDay.hasOwnProperty(dateStr)) {
+          revenueByDay[dateStr] += order.totalAmount || 0;
+        }
+      }
+    });
+    
+    // Convert to array format [{ name: 'Mon', value: 5000 }, ...]
+    const revenueTrends = Object.entries(revenueByDay)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([dateStr, value]) => {
+        const date = new Date(dateStr);
+        return {
+          name: dayNames[date.getDay()],
+          value: value
+        };
+      });
+    
+    // Category Sales: Loop through order items, fetch their product category
+    const categoryMap = {};
+    orders.forEach(order => {
+      if (order.items && order.items.length > 0) {
+        order.items.forEach(item => {
+          if (item.product && item.product.category) {
+            const category = item.product.category;
+            categoryMap[category] = (categoryMap[category] || 0) + (item.quantity || 1);
+          }
+        });
+      }
+    });
+    
+    // If no orders yet, fall back to product count by category
+    if (Object.keys(categoryMap).length === 0) {
+      const productCategories = await Product.aggregate([
+        { $group: { _id: '$category', count: { $sum: 1 } } }
+      ]);
+      productCategories.forEach(cat => {
+        categoryMap[cat._id || 'Uncategorized'] = cat.count;
+      });
+    }
+    
+    // Convert to array format [{ name: 'Footwear', value: 12 }, ...]
+    const categorySales = Object.entries(categoryMap).map(([name, value]) => ({
+      name: name || 'Uncategorized',
+      value: value || 0
+    }));
+    
+    res.json({
+      success: true,
+      totalRevenue,
+      totalOrders,
+      totalUsers,
+      revenueTrends,
+      categorySales
+    });
+  } catch (error) {
+    console.error('Error fetching analytics:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch analytics data'
     });
   }
 };
