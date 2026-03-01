@@ -65,15 +65,41 @@ export const initiateMpesaPayment = async (req, res) => {
   try {
     // Extract raw values from request body
     const rawPhone = req.body.phone || req.body.phoneNumber;
-    const rawAmount = req.body.amount;
+    let rawAmount = req.body.amount;
     const { userEmail, orderId } = req.body;
 
     console.log('📥 Received payment request:', { rawPhone, rawAmount, userEmail, orderId });
 
-    if (!rawPhone || !rawAmount || !userEmail) {
+    if (!rawPhone || !userEmail) {
       return res.status(400).json({
         success: false,
-        message: 'Phone number, amount, and email are required'
+        message: 'Phone number and email are required'
+      });
+    }
+
+    // SECURITY: Recalculate total from database if orderId is provided
+    // This ensures the amount cannot be manipulated from the frontend
+    if (orderId) {
+      try {
+        const order = await Order.findById(orderId);
+        if (order) {
+          // Recalculate total from order items stored in database
+          const calculatedTotal = order.items.reduce((sum, item) => {
+            return sum + (item.price * item.quantity);
+          }, 0);
+          rawAmount = calculatedTotal;
+          console.log('🔒 Recalculated total from database:', rawAmount);
+        }
+      } catch (calcError) {
+        console.error('⚠️ Error recalculating order total:', calcError.message);
+        // Fall back to frontend amount if calculation fails
+      }
+    }
+
+    if (!rawAmount) {
+      return res.status(400).json({
+        success: false,
+        message: 'Amount is required'
       });
     }
 
