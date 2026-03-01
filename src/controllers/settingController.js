@@ -1,5 +1,46 @@
 import Setting from '../models/Setting.js';
 
+// Get exchange rate (Public)
+export const getExchangeRate = async (req, res) => {
+  try {
+    const settings = await Setting.findOne({ key: 'exchangeRate' });
+    if (!settings) {
+      // Return default rate if not found
+      return res.status(200).json({ success: true, rate: 130 });
+    }
+    res.status(200).json({ success: true, rate: settings.value.rate });
+  } catch (error) {
+    console.error('❌ GET_EXCHANGE_RATE Error:', error.message);
+    res.status(500).json({ message: 'Error fetching exchange rate', error: error.message });
+  }
+};
+
+// Update exchange rate (Admin)
+export const updateExchangeRate = async (req, res) => {
+  try {
+    const { rate } = req.body;
+    
+    if (!rate || typeof rate !== 'number' || rate <= 0) {
+      return res.status(400).json({ message: 'Valid exchange rate is required' });
+    }
+
+    const settings = await Setting.findOneAndUpdate(
+      { key: 'exchangeRate' },
+      { 
+        key: 'exchangeRate',
+        value: { rate },
+        updatedAt: Date.now()
+      },
+      { new: true, upsert: true }
+    );
+    
+    res.status(200).json({ success: true, rate: settings.value.rate });
+  } catch (error) {
+    console.error('❌ UPDATE_EXCHANGE_RATE Error:', error.message);
+    res.status(500).json({ message: 'Error updating exchange rate', error: error.message });
+  }
+};
+
 // Get flash sale settings (Public)
 export const getFlashSaleSettings = async (req, res) => {
   try {

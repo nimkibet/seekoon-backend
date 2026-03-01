@@ -1,8 +1,12 @@
 import express from 'express';
-import { getFlashSaleSettings, updateFlashSaleSettings, getHomeSettings, updateHomeSettings } from '../controllers/settingController.js';
+import { getFlashSaleSettings, updateFlashSaleSettings, getHomeSettings, updateHomeSettings, getExchangeRate, updateExchangeRate } from '../controllers/settingController.js';
 import { authMiddleware, adminMiddleware } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// Exchange Rate (Public GET, Admin PUT)
+router.get('/exchange-rate', getExchangeRate);
+router.put('/exchange-rate', authMiddleware, adminMiddleware, updateExchangeRate);
 
 // Public route to check status
 router.get('/flash-sale', getFlashSaleSettings);
