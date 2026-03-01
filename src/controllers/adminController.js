@@ -509,19 +509,20 @@ export const exportTransactions = async (req, res) => {
 };
 
 // Get Analytics Data - Real data for charts
+// Filter by 'delivered' status since payment system is in development
 export const getAnalytics = async (req, res) => {
   try {
-    // Fetch all non-cancelled orders
-    const orders = await Order.find({ status: { $ne: 'cancelled' } }).populate('items.product');
-    
-    // Calculate totalRevenue (sum of all totalAmount)
-    const totalRevenue = orders.reduce((acc, order) => acc + (order.totalAmount || 0), 0);
-    
-    // Calculate totalOrders and fetch totalUsers count
-    const totalOrders = orders.length;
+    // Fetch totalUsers independently - never depends on orders
     const totalUsers = await User.countDocuments({});
     
-    // Revenue Trends: Group orders by createdAt date (last 7 days)
+    // Fetch ONLY delivered orders for analytics calculation
+    const deliveredOrders = await Order.find({ status: 'delivered' }).populate('items.product');
+    
+    // Calculate totalOrders and totalRevenue from delivered orders
+    const totalOrders = deliveredOrders.length;
+    const totalRevenue = deliveredOrders.reduce((acc, order) => acc + (order.totalAmount || 0), 0);
+    
+    // Revenue Trends: Group delivered orders by createdAt date (last 7 days)
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6); // Include today, go back 6 days
@@ -535,8 +536,8 @@ export const getAnalytics = async (req, res) => {
       revenueByDay[dateStr] = 0;
     }
     
-    // Group orders by date
-    orders.forEach(order => {
+    // Group delivered orders by date
+    deliveredOrders.forEach(order => {
       if (order.createdAt) {
         const dateStr = order.createdAt.toISOString().split('T')[0];
         if (revenueByDay.hasOwnProperty(dateStr)) {
@@ -556,9 +557,9 @@ export const getAnalytics = async (req, res) => {
         };
       });
     
-    // Category Sales: Loop through order items, fetch their product category
+    // Category Sales: Loop through delivered order items, fetch their product category
     const categoryMap = {};
-    orders.forEach(order => {
+    deliveredOrders.forEach(order => {
       if (order.items && order.items.length > 0) {
         order.items.forEach(item => {
           if (item.product && item.product.category) {
