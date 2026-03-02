@@ -1,26 +1,25 @@
 import mongoose from 'mongoose';
 
 const notificationSchema = new mongoose.Schema({
-  title: {
+  type: {
     type: String,
-    required: true
+    default: 'NEW_ORDER'
   },
   message: {
     type: String,
     required: true
   },
-  type: {
-    type: String,
-    enum: ['order', 'payment', 'user', 'system', 'stock'],
-    default: 'system'
+  orderId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Order'
   },
   isRead: {
     type: Boolean,
     default: false
   },
-  relatedId: {
-    type: mongoose.Schema.Types.ObjectId,
-    refPath: 'type'
+  createdAt: {
+    type: Date,
+    default: Date.now
   }
 }, {
   timestamps: true

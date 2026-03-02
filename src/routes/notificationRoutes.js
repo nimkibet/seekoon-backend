@@ -1,15 +1,15 @@
 import express from 'express';
 import Notification from '../models/Notification.js';
-import { authMiddleware } from '../middleware/auth.js';
+import { authMiddleware, adminMiddleware } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // Get all notifications (admin only)
-router.get('/', authMiddleware, async (req, res) => {
+router.get('/', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const notifications = await Notification.find()
       .sort({ createdAt: -1 })
-      .limit(50);
+      .limit(20);
     
     const unreadCount = await Notification.countDocuments({ isRead: false });
     
@@ -28,7 +28,7 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 // Mark notification as read
-router.patch('/:id/read', authMiddleware, async (req, res) => {
+router.patch('/:id/read', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const notification = await Notification.findByIdAndUpdate(
       req.params.id,
@@ -50,7 +50,7 @@ router.patch('/:id/read', authMiddleware, async (req, res) => {
 });
 
 // Mark all as read
-router.patch('/read-all', authMiddleware, async (req, res) => {
+router.patch('/read-all', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     await Notification.updateMany(
       { isRead: false },
@@ -71,7 +71,7 @@ router.patch('/read-all', authMiddleware, async (req, res) => {
 });
 
 // Delete notification
-router.delete('/:id', authMiddleware, async (req, res) => {
+router.delete('/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     await Notification.findByIdAndDelete(req.params.id);
     

@@ -169,8 +169,8 @@ export const initiateMpesaPayment = async (req, res) => {
     // STK Push request
     const shortcode = process.env.SHORTCODE || process.env.DARAJA_BUSINESS_SHORTCODE || process.env.MPESA_SHORTCODE;
     
-    // HARDCODED: Force callback URL to production Railway endpoint
-    const CallBackURL = 'https://seekoon-backend-production.up.railway.app/api/payment/mpesa-callback';
+    // HARDCODED: TEMPORARY TEST - Route STK Push callbacks to webhook.site for testing
+    const CallBackURL = 'https://webhook.site/63647568-8f3b-42dd-951d-0bb0aac87cc2';
     console.log('🎯 Using CallBackURL:', CallBackURL);
 
     // Determine base URL based on environment
@@ -300,18 +300,14 @@ export const mpesaCallback = async (req, res) => {
               await order.save();
               console.log(`✅ Order ${order._id} marked as paid!`);
               
-              // Create admin notification
+              // Create admin notification for paid order
               try {
-                const shipping = order.shippingAddress || {};
-                const notificationMessage = `Payment Received! KSh ${amountPaid} from ${phoneNumber || 'M-Pesa'}. Ship to: ${shipping.address || 'N/A'}, ${shipping.city || 'N/A'}. Contact: ${order.userEmail || 'N/A'}`;
-                
                 await Notification.create({
-                  title: 'New M-Pesa Order Paid! 🚀',
-                  message: notificationMessage,
-                  type: 'order',
-                  relatedId: order._id
+                  type: 'NEW_ORDER',
+                  message: `Payment received! Order paid: KSh ${amountPaid || order.totalAmount}`,
+                  orderId: order._id
                 });
-                console.log('✅ Admin notification created!');
+                console.log('✅ Admin notification created for paid order!');
               } catch (notifError) {
                 console.error('⚠️ Error creating notification:', notifError.message);
               }
