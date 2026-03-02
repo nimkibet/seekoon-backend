@@ -69,11 +69,14 @@ export const addToCart = async (req, res) => {
   try {
     // SECURITY: Check if user is authenticated
     if (!req.user || !req.user._id) {
+      console.error('🛒 ADD_TO_CART: Not authenticated, req.user:', req.user);
       return res.status(401).json({ success: false, message: 'Not authenticated' });
     }
     
     // SECURITY: Always use authenticated user's ID from token
     const userId = req.user._id;
+    console.log('🛒 ADD_TO_CART: Request for user:', userId);
+    
     // Check for product ID in multiple formats
     let { productId, size, color, quantity } = req.body;
     
