@@ -7,6 +7,7 @@ export const createOrder = async (req, res) => {
   try {
     // Log the incoming payload to see what frontend actually sent
     console.log("🔥 INCOMING ORDER REQUEST BODY:", JSON.stringify(req.body, null, 2));
+    console.log("👤 AUTH USER:", JSON.stringify(req.user, null, 2));
     
     const {
       items,
@@ -17,10 +18,17 @@ export const createOrder = async (req, res) => {
       convenientTime
     } = req.body;
 
-    // Get user from auth middleware (optional - can be guest checkout)
-    // JWT token contains userId, so we check all possible field names
-    const userId = req.user?.userId || req.user?._id || req.user?.id || null;
-    const userEmail = req.user?.email || shippingAddress?.email || 'guest@seekon.com';
+    // Get user from auth middleware - MUST exist since route is protected
+    const userId = req.user?._id || req.user?.userId || req.user?.id;
+    const userEmail = req.user?.email;
+    
+    // CRITICAL: Do NOT allow guest checkout if authenticated
+    if (!userId || !userEmail) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required. Please log in to place an order.'
+      });
+    }
 
     if (!items || items.length === 0) {
       return res.status(400).json({
