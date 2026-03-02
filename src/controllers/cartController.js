@@ -17,7 +17,11 @@ export const getCart = async (req, res) => {
     const userId = req.user._id; 
     
     // Try to find cart and populate product references
-    let cart = await Cart.findOne({ userId }).populate('items.product');
+    // Note: Cart model uses 'productId' not 'product'
+    let cart = await Cart.findOne({ userId }).populate({
+      path: 'items.productId',
+      select: 'name price image category countInStock brand'
+    });
     
     if (!cart) {
       // Return empty cart if none exists
@@ -31,8 +35,8 @@ export const getCart = async (req, res) => {
     const originalLength = cart.items.length;
     cart.items = cart.items.filter(item => {
       // Keep item only if product exists (either as ID reference or populated object)
-      if (item.product === null) return false; // Populated but deleted
-      if (item.product === undefined && !item.productId) return false; // No reference at all
+      if (item.productId === null) return false; // Populated but deleted
+      if (item.productId === undefined) return false; // No reference at all
       return true;
     });
     
