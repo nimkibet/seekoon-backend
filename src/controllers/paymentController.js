@@ -558,3 +558,179 @@ export const queryMpesaTransaction = async (req, res) => {
     });
   }
 };
+
+// Initialize Flutterwave
+const initFlutterwave = () => {
+  const publicKey = process.env.FLUTTERWAVE_PUBLIC_KEY;
+  const secretKey = process.env.FLUTTERWAVE_SECRET_KEY;
+  
+  if (!publicKey || !secretKey) {
+    throw new Error('Flutterwave credentials not configured');
+  }
+  
+  return new Flutterwave(publicKey, secretKey);
+};
+
+// Initiate Flutterwave Payment
+export const initiateFlutterwavePayment = async (req, res) => {
+  try {
+    const { amount, email, phone, orderId } = req.body;
+    
+    if (!amount || !email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Amount and email are required'
+      });
+    }
+
+    const flw = initFlutterwave();
+    
+    const reference = `FW${Date.now()}${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+    
+    const payload = {
+      tx_ref: reference,
+      amount: amount.toString(),
+      currency: 'KES',
+      redirect_url: `${process.env.FRONTEND_URL || 'https://seekon.vercel.app'}/order-confirmation`,
+      meta: {
+        orderId,
+        source: 'seekon-app'
+      },
+      customer: {
+        email,
+        phone_number: phone || '',
+        name: email.split('@')[0]
+      },
+      customizations: {
+        title: 'Seekon Apparel',
+        logo: 'https://seekon.vercel.app/logo.png'
+      }
+    };
+
+    const response = await flw.Payment.plan.create(payload);
+    
+    if (response.status === 'success') {
+      // Create pending transaction
+      await Transaction.create({
+        userEmail: email,
+        phoneNumber: phone || '',
+        method: 'flutterwave',
+        amount,
+        status: 'pending',
+        reference
+      });
+      
+      res.status(200).json({
+        success: true,
+        message: 'Flutterwave payment initiated',
+        data: {
+          link: response.data.link,
+          reference
+        }
+      });
+    } else {
+      throw new Error(response.message || 'Failed to initiate Flutterwave payment');
+    }
+  } catch (error) {
+    console.error('❌ Flutterwave payment error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to initiate Flutterwave payment'
+    });
+  }
+};
+
+// Flutterwave Callback
+export const flutterwaveCallback = async (req, res) => {
+  try {
+    const { transaction_id, tx_ref, status } = req.query;
+    
+    console.log('🔔 Flutterwave callback received:', { transaction_id, tx_ref, status });
+    
+    if (status === 'successful') {
+      const flw = initFlutterwave();
+      const response = await flw.Transaction.verify({ id: transaction_id });
+      
+      if (response.status === 'success' && response.data.status === 'successful') {
+        const amount = response.data.amount;
+        const email = response.data.customer.email;
+        
+        // Update transaction
+        await Transaction.findOneAndUpdate(
+          { reference: tx_ref },
+          { 
+            status: 'completed',
+            callbackData: response.data
+          }
+        );
+        
+        // Update order
+        const order = await Order.findOne({ paymentReference: tx_ref });
+        if (order) {
+          order.isPaid = true;
+          order.paidAt = new Date();
+          order.paymentResult = {
+            id: transaction_id,
+            status: 'Completed',
+            email_address: email
+          };
+          order.status = 'processing';
+          await order.save();
+          
+          // Clear cart
+          if (order.user) {
+            await Cart.findOneAndUpdate(
+              { userId: order.user },
+              { items: [], totalItems: 0, totalPrice: 0 }
+            );
+          }
+          
+          // Create notification
+          await Notification.create({
+            type: 'NEW_ORDER',
+            message: `Payment received! Order paid: KSh ${amount}`,
+            orderId: order._id
+          });
+        }
+        
+        res.redirect(`${process.env.FRONTEND_URL || 'https://seekon.vercel.app'}/order-confirmation?success=true&tx_ref=${tx_ref}`);
+      } else {
+        res.redirect(`${process.env.FRONTEND_URL || 'https://seekon.vercel.app'}/order-confirmation?success=false&tx_ref=${tx_ref}`);
+      }
+    } else {
+      res.redirect(`${process.env.FRONTEND_URL || 'https://seekon.vercel.app'}/order-confirmation?success=false&tx_ref=${tx_ref}`);
+    }
+  } catch (error) {
+    console.error('❌ Flutterwave callback error:', error.message);
+    res.redirect(`${process.env.FRONTEND_URL || 'https://seekon.vercel.app'}/order-confirmation?success=false`);
+  }
+};
+
+// Get user transactions
+export const getUserTransactions = async (req, res) => {
+  try {
+    const { userEmail } = req.params;
+    
+    if (!userEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'User email is required'
+      });
+    }
+    
+    const transactions = await Transaction.find({ userEmail })
+      .sort({ createdAt: -1 })
+      .limit(50);
+    
+    res.status(200).json({
+      success: true,
+      transactions
+    });
+  } catch (error) {
+    console.error('❌ Error fetching user transactions:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch transactions'
+    });
+  }
+};
