@@ -6,7 +6,8 @@ import {
   getAllTransactions,
   getTransaction,
   exportTransactions,
-  getAnalytics
+  getAnalytics,
+  cleanupAbandonedOrders
 } from '../controllers/adminController.js';
 import {
   getAllUsers,
@@ -153,6 +154,9 @@ router.get('/orders', authMiddleware, getAllOrders);
 router.get('/orders/:id', authMiddleware, getOrder);
 router.patch('/orders/:id/status', authMiddleware, updateOrderStatus);
 router.patch('/orders/:id/cancel', authMiddleware, cancelOrder);
+
+// Cleanup route
+router.delete('/cleanup-abandoned', authMiddleware, adminMiddleware, cleanupAbandonedOrders);
 
 // Notification routes
 router.get('/notifications', authMiddleware, adminMiddleware, async (req, res) => {

@@ -1,5 +1,6 @@
 import Transaction from '../models/Transaction.js';
 import Order from '../models/Order.js';
+import Cart from '../models/Cart.js';
 import Notification from '../models/Notification.js';
 import crypto from 'crypto';
 import axios from 'axios';
@@ -124,18 +125,8 @@ export const initiateMpesaPayment = async (req, res) => {
     const finalAmount = Math.round(Number(rawAmount));
     console.log(`💰 Cleaned Amount: ${finalAmount}`);
 
-    // Generate reference
+    // Generate reference - will be used to create Transaction upon successful payment
     const reference = `MPESA${Date.now()}${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
-
-    // Create transaction record
-    const transaction = await Transaction.create({
-      userEmail,
-      phoneNumber: formattedPhone,
-      method: 'mpesa',
-      amount: finalAmount, // Use the cleaned amount
-      status: 'pending',
-      reference
-    });
 
     // Check if credentials are set up
     const hasCredentials = 
@@ -153,7 +144,6 @@ export const initiateMpesaPayment = async (req, res) => {
         message: 'Mock: STK Push would be sent. Please configure M-Pesa credentials in .env file.',
         mock: true,
         data: {
-          transactionId: transaction._id,
           reference,
           checkoutRequestID: 'MOCK_CHECKOUT_123'
         }
@@ -232,15 +222,10 @@ export const initiateMpesaPayment = async (req, res) => {
       }
     }
 
-    // Update transaction with M-Pesa response
-    transaction.mpesaResponse = response.data;
-    await transaction.save();
-
     res.status(200).json({
       success: true,
       message: 'STK Push sent. Please complete the payment on your phone.',
       data: {
-        transactionId: transaction._id,
         reference,
         checkoutRequestID: response.data.CheckoutRequestID
       }
@@ -269,73 +254,99 @@ export const mpesaCallback = async (req, res) => {
       const resultCode = callback.ResultCode;
       const checkoutRequestID = callback.CheckoutRequestID;
 
-      // Find transaction by checkout request ID
-      const transaction = await Transaction.findOne({
-        'mpesaResponse.CheckoutRequestID': checkoutRequestID
-      });
+      if (resultCode === 0) {
+        // Payment successful - extract metadata
+        const meta = callback.CallbackMetadata?.Item || [];
+        const amountPaid = meta.find(item => item.Name === 'Amount')?.Value;
+        const mpesaReceipt = meta.find(item => item.Name === 'MpesaReceiptNumber')?.Value;
+        const phoneNumber = meta.find(item => item.Name === 'PhoneNumber')?.Value;
+        
+        console.log(`✅ Payment SUCCESS! Receipt: ${mpesaReceipt}, Amount: ${amountPaid}, Phone: ${phoneNumber}`);
+        
+        // Find the order first to get user info
+        let order = null;
+        try {
+          order = await Order.findOne({ mpesaCheckoutRequestId: checkoutRequestID });
+        } catch (orderError) {
+          console.error('⚠️ Error finding order:', orderError.message);
+        }
 
-      if (transaction) {
-        if (resultCode === 0) {
-          // Payment successful - extract metadata
-          const meta = callback.CallbackMetadata?.Item || [];
-          const amountPaid = meta.find(item => item.Name === 'Amount')?.Value;
-          const mpesaReceipt = meta.find(item => item.Name === 'MpesaReceiptNumber')?.Value;
-          const phoneNumber = meta.find(item => item.Name === 'PhoneNumber')?.Value;
-          
-          console.log(`✅ Payment SUCCESS! Receipt: ${mpesaReceipt}, Amount: ${amountPaid}, Phone: ${phoneNumber}`);
-          
-          transaction.status = 'completed';
-          transaction.callbackData = callback;
-          await transaction.save();
+        // Get userEmail from order or use phone number as fallback
+        const userEmail = order?.userEmail || (phoneNumber ? `${phoneNumber}@mpesa.com` : 'unknown@seekon.com');
 
-          // Also update the order if it exists
+        // Create Transaction ONLY when payment succeeds
+        try {
+          await Transaction.create({
+            userEmail,
+            phoneNumber: phoneNumber || '',
+            method: 'mpesa',
+            amount: amountPaid || 0,
+            status: 'completed',
+            reference: order?.paymentReference || checkoutRequestID,
+            mpesaResponse: callback,
+            callbackData: callback
+          });
+          console.log('✅ Transaction created for successful payment!');
+        } catch (transError) {
+          console.error('⚠️ Error creating transaction:', transError.message);
+        }
+
+        // Update the order if it exists
+        if (order) {
           try {
-            const order = await Order.findOne({ mpesaCheckoutRequestId: checkoutRequestID });
-            if (order) {
-              order.isPaid = true;
-              order.paidAt = new Date();
-              order.paymentResult = {
-                id: mpesaReceipt,
-                status: 'Completed',
-                email_address: phoneNumber
-              };
-              order.status = 'processing';
-              await order.save();
-              console.log(`✅ Order ${order._id} marked as paid!`);
-              
-              // Create admin notification for paid order
+            order.isPaid = true;
+            order.paidAt = new Date();
+            order.paymentResult = {
+              id: mpesaReceipt,
+              status: 'Completed',
+              email_address: phoneNumber
+            };
+            order.status = 'processing';
+            await order.save();
+            console.log(`✅ Order ${order._id} marked as paid!`);
+
+            // Clear the user's cart ONLY when payment succeeds
+            if (order.user) {
               try {
-                await Notification.create({
-                  type: 'NEW_ORDER',
-                  message: `Payment received! Order paid: KSh ${amountPaid || order.totalAmount}`,
-                  orderId: order._id
-                });
-                console.log('✅ Admin notification created for paid order!');
-              } catch (notifError) {
-                console.error('⚠️ Error creating notification:', notifError.message);
+                await Cart.findOneAndUpdate(
+                  { userId: order.user },
+                  { items: [], totalItems: 0, totalPrice: 0 }
+                );
+                console.log(`✅ Cart cleared for user ${order.user}!`);
+              } catch (cartError) {
+                console.error('⚠️ Error clearing cart:', cartError.message);
               }
             }
-          } catch (orderError) {
-            console.error('⚠️ Error updating order:', orderError.message);
-          }
-        } else {
-          // Payment failed
-          console.log(`❌ Payment FAILED: ${callback.ResultDesc} (Code: ${resultCode})`);
-          transaction.status = 'failed';
-          transaction.callbackData = callback;
-          await transaction.save();
-
-          // Update order status to cancelled
-          try {
-            const order = await Order.findOne({ mpesaCheckoutRequestId: checkoutRequestID });
-            if (order) {
-              order.status = 'cancelled';
-              await order.save();
-              console.log(`❌ Order ${order._id} marked as cancelled!`);
+            
+            // Create admin notification for paid order
+            try {
+              await Notification.create({
+                type: 'NEW_ORDER',
+                message: `Payment received! Order paid: KSh ${amountPaid || order.totalAmount}`,
+                orderId: order._id
+              });
+              console.log('✅ Admin notification created for paid order!');
+            } catch (notifError) {
+              console.error('⚠️ Error creating notification:', notifError.message);
             }
           } catch (orderError) {
             console.error('⚠️ Error updating order:', orderError.message);
           }
+        }
+      } else {
+        // Payment failed - do NOT create a Transaction document
+        console.log(`❌ Payment FAILED: ${callback.ResultDesc} (Code: ${resultCode})`);
+
+        // Update order status to cancelled
+        try {
+          const order = await Order.findOne({ mpesaCheckoutRequestId: checkoutRequestID });
+          if (order) {
+            order.status = 'cancelled';
+            await order.save();
+            console.log(`❌ Order ${order._id} marked as cancelled!`);
+          }
+        } catch (orderError) {
+          console.error('⚠️ Error updating order:', orderError.message);
         }
       }
     }
@@ -354,73 +365,84 @@ export const mpesaCallback = async (req, res) => {
 // M-Pesa STK Push Query - Fallback to check transaction status
 const processMpesaResult = async (resultCode, checkoutRequestID, amount, mpesaReceipt, phoneNumber) => {
   if (resultCode === 0 || resultCode === '0') {
-    // Payment successful - find and update transaction
-    const transaction = await Transaction.findOne({
-      'mpesaResponse.CheckoutRequestID': checkoutRequestID
-    });
+    // Payment successful - create transaction
+    try {
+      // Find the order first to get user info
+      const order = await Order.findOne({ mpesaCheckoutRequestId: checkoutRequestID });
+      const userEmail = order?.userEmail || (phoneNumber ? `${phoneNumber}@mpesa.com` : 'unknown@seekon.com');
 
-    if (transaction) {
-      console.log(`✅ Query: Payment SUCCESS! Receipt: ${mpesaReceipt}, Amount: ${amount}, Phone: ${phoneNumber}`);
-      
-      transaction.status = 'completed';
-      transaction.callbackData = { ResultCode: resultCode, ResultDesc: 'Success via query' };
-      await transaction.save();
+      await Transaction.create({
+        userEmail,
+        phoneNumber: phoneNumber || '',
+        method: 'mpesa',
+        amount: amount || 0,
+        status: 'completed',
+        reference: order?.paymentReference || checkoutRequestID,
+        callbackData: { ResultCode: resultCode, ResultDesc: 'Success via query' }
+      });
+      console.log('✅ Transaction created via query for successful payment!');
+    } catch (transError) {
+      console.error('⚠️ Error creating transaction:', transError.message);
+    }
 
-      // Also update the order if it exists
-      try {
-        const order = await Order.findOne({ mpesaCheckoutRequestId: checkoutRequestID });
-        if (order) {
-          order.isPaid = true;
-          order.paidAt = new Date();
-          order.paymentResult = {
-            id: mpesaReceipt,
-            status: 'Completed',
-            email_address: phoneNumber
-          };
-          order.status = 'processing';
-          await order.save();
-          console.log(`✅ Order ${order._id} marked as paid via query!`);
-          
-          // Create admin notification for paid order
+    // Also update the order if it exists
+    try {
+      const order = await Order.findOne({ mpesaCheckoutRequestId: checkoutRequestID });
+      if (order) {
+        order.isPaid = true;
+        order.paidAt = new Date();
+        order.paymentResult = {
+          id: mpesaReceipt,
+          status: 'Completed',
+          email_address: phoneNumber
+        };
+        order.status = 'processing';
+        await order.save();
+        console.log(`✅ Order ${order._id} marked as paid via query!`);
+        
+        // Clear the user's cart ONLY when payment succeeds
+        if (order.user) {
           try {
-            await Notification.create({
-              type: 'NEW_ORDER',
-              message: `Payment received! Order paid: KSh ${amount || order.totalAmount}`,
-              orderId: order._id
-            });
-            console.log('✅ Admin notification created for paid order via query!');
-          } catch (notifError) {
-            console.error('⚠️ Error creating notification:', notifError.message);
+            await Cart.findOneAndUpdate(
+              { userId: order.user },
+              { items: [], totalItems: 0, totalPrice: 0 }
+            );
+            console.log(`✅ Cart cleared for user ${order.user} via query!`);
+          } catch (cartError) {
+            console.error('⚠️ Error clearing cart:', cartError.message);
           }
         }
-      } catch (orderError) {
-        console.error('⚠️ Error updating order:', orderError.message);
-      }
-      return true;
-    }
-  } else {
-    // Payment failed
-    console.log(`❌ Query: Payment FAILED (Code: ${resultCode})`);
-    const transaction = await Transaction.findOne({
-      'mpesaResponse.CheckoutRequestID': checkoutRequestID
-    });
-    
-    if (transaction) {
-      transaction.status = 'failed';
-      transaction.callbackData = { ResultCode: resultCode, ResultDesc: 'Failed via query' };
-      await transaction.save();
-
-      // Update order status to cancelled
-      try {
-        const order = await Order.findOne({ mpesaCheckoutRequestId: checkoutRequestID });
-        if (order) {
-          order.status = 'cancelled';
-          await order.save();
-          console.log(`❌ Order ${order._id} marked as cancelled via query!`);
+        
+        // Create admin notification for paid order
+        try {
+          await Notification.create({
+            type: 'NEW_ORDER',
+            message: `Payment received! Order paid: KSh ${amount || order.totalAmount}`,
+            orderId: order._id
+          });
+          console.log('✅ Admin notification created for paid order via query!');
+        } catch (notifError) {
+          console.error('⚠️ Error creating notification:', notifError.message);
         }
-      } catch (orderError) {
-        console.error('⚠️ Error updating order:', orderError.message);
       }
+    } catch (orderError) {
+      console.error('⚠️ Error updating order:', orderError.message);
+    }
+    return true;
+  } else {
+    // Payment failed - do NOT create a Transaction document
+    console.log(`❌ Query: Payment FAILED (Code: ${resultCode})`);
+
+    // Update order status to cancelled
+    try {
+      const order = await Order.findOne({ mpesaCheckoutRequestId: checkoutRequestID });
+      if (order) {
+        order.status = 'cancelled';
+        await order.save();
+        console.log(`❌ Order ${order._id} marked as cancelled via query!`);
+      }
+    } catch (orderError) {
+      console.error('⚠️ Error updating order:', orderError.message);
     }
     return false;
   }
@@ -504,25 +526,27 @@ export const queryMpesaTransaction = async (req, res) => {
     }
 
     // Process the result
-    const isSuccess = await processMpesaResult(resultCode, checkoutRequestId, amount, mpesaReceipt, phoneNumber);
+    await processMpesaResult(resultCode, checkoutRequestId, amount, mpesaReceipt, phoneNumber);
 
+    // Return appropriate response
     if (resultCode === 0 || resultCode === '0') {
-      return res.status(200).json({
+      res.status(200).json({
         success: true,
-        message: 'Payment verified successfully',
+        message: 'Payment successful',
         data: {
-          status: 'success',
-          receiptNumber: mpesaReceipt,
-          amount: amount
+          status: 'completed',
+          mpesaReceipt,
+          amount,
+          phoneNumber
         }
       });
     } else {
-      return res.status(200).json({
+      res.status(200).json({
         success: false,
-        message: response.data.ResultDesc || 'Payment not found or failed',
+        message: response.data.ResultDesc || 'Payment failed or still pending',
         data: {
           status: 'failed',
-          resultCode: resultCode
+          resultCode
         }
       });
     }
@@ -531,132 +555,6 @@ export const queryMpesaTransaction = async (req, res) => {
     res.status(500).json({
       success: false,
       message: error.response?.data?.errorMessage || error.message || 'Failed to query M-Pesa transaction'
-    });
-  }
-};
-
-// Flutterwave Payment
-export const initiateFlutterwavePayment = async (req, res) => {
-  try {
-    const { email, amount, userEmail } = req.body;
-
-    if (!email || !amount || !userEmail) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email, amount, and user email are required'
-      });
-    }
-
-    // Generate reference
-    const reference = `FLW${Date.now()}${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
-
-    // Create transaction record
-    const transaction = await Transaction.create({
-      userEmail,
-      phoneNumber: email, // Store email as phoneNumber for Flutterwave
-      method: 'card',
-      amount: parseFloat(amount),
-      status: 'pending',
-      reference
-    });
-
-    // Flutterwave payment request
-    const paymentData = {
-      tx_ref: reference,
-      amount: amount,
-      currency: 'KES',
-      redirect_url: `${process.env.CALLBACK_URL}/api/payment/flutterwave-callback`,
-      payment_options: 'card,mpesa',
-      customer: {
-        email: email,
-        name: userEmail
-      },
-      customizations: {
-        title: 'Seekon Apparel',
-        description: 'Premium clothing and sneakers'
-      }
-    };
-
-    const response = await axios.post(
-      'https://api.flutterwave.com/v3/payments',
-      paymentData,
-      {
-        headers: {
-          'Authorization': `Bearer ${process.env.FLW_SECRET_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-
-    // Update transaction with Flutterwave response
-    transaction.flutterwaveResponse = response.data;
-    await transaction.save();
-
-    res.status(200).json({
-      success: true,
-      message: 'Payment link generated',
-      data: {
-        transactionId: transaction._id,
-        reference,
-        paymentLink: response.data.data.link
-      }
-    });
-  } catch (error) {
-    console.error('Flutterwave payment error:', error);
-    res.status(500).json({
-      success: false,
-      message: error.response?.data?.message || 'Failed to initiate Flutterwave payment'
-    });
-  }
-};
-
-// Flutterwave Callback
-export const flutterwaveCallback = async (req, res) => {
-  try {
-    const { status, tx_ref } = req.query;
-
-    // Find transaction by reference
-    const transaction = await Transaction.findOne({ reference: tx_ref });
-
-    if (transaction) {
-      if (status === 'successful') {
-        transaction.status = 'completed';
-      } else {
-        transaction.status = 'failed';
-      }
-      transaction.callbackData = req.query;
-      await transaction.save();
-    }
-
-    // Redirect to frontend
-    res.redirect(`${process.env.FRONTEND_URL}/checkout-success?status=${status}`);
-  } catch (error) {
-    console.error('Flutterwave callback error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Callback processing failed'
-    });
-  }
-};
-
-// Get User Transactions
-export const getUserTransactions = async (req, res) => {
-  try {
-    const { userEmail } = req.params;
-
-    const transactions = await Transaction.find({ userEmail })
-      .sort({ createdAt: -1 })
-      .limit(50);
-
-    res.status(200).json({
-      success: true,
-      transactions
-    });
-  } catch (error) {
-    console.error('Get transactions error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch transactions'
     });
   }
 };

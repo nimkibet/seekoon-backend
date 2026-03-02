@@ -603,3 +603,30 @@ export const getAnalytics = async (req, res) => {
   }
 };
 
+// Cleanup abandoned orders (older than 1 hour with pending status)
+export const cleanupAbandonedOrders = async (req, res) => {
+  try {
+    // Calculate date 1 hour ago
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    
+    // Find and delete all pending orders older than 1 hour
+    const result = await Order.deleteMany({ 
+      status: 'pending', 
+      createdAt: { $lt: oneHourAgo } 
+    });
+
+    console.log(`🧹 Cleanup: Deleted ${result.deletedCount} abandoned orders`);
+
+    res.json({ 
+      success: true, 
+      message: `Deleted ${result.deletedCount} abandoned orders.` 
+    });
+  } catch (error) {
+    console.error('Error cleaning up abandoned orders:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to cleanup abandoned orders'
+    });
+  }
+};
+
