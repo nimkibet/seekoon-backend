@@ -38,18 +38,24 @@ export const createOrder = async (req, res) => {
       postalCode: shippingAddress.zipCode
     } : {};
 
+    // CRITICAL FIX: Map productId from cart to product in order
+    // Cart uses productId, Order uses product
+    const orderItems = items.map(item => ({
+      product: item.product || item.productId || item.id || item._id, // Cart items have productId, not product
+      name: item.name,
+      price: item.price,
+      quantity: item.quantity,
+      image: item.image,
+      size: item.size,
+      color: item.color
+    }));
+    
+    console.log('🔍 Creating order with items:', JSON.stringify(orderItems, null, 2));
+
     const order = await Order.create({
       user: userId, // Can be null for guest checkout
       userEmail: userEmail,
-      items: items.map(item => ({
-        product: item.product || item.id || item._id, // Use product field if available, fallback to id or _id
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-        image: item.image,
-        size: item.size,
-        color: item.color
-      })),
+      items: orderItems,
       totalAmount: totalAmount || 0,
       paymentMethod: normalizedPaymentMethod,
       shippingAddress: mappedShippingAddress,
