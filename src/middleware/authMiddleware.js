@@ -17,7 +17,8 @@ const protect = asyncHandler(async (req, res, next) => {
       console.log('🔐 Token decoded:', decoded);
 
       // CRITICAL: Handle both 'id' and 'userId' for backward compatibility
-      const userId = decoded.id || decoded.userId;
+      // Token uses userId, so prioritize that
+      const userId = decoded.userId || decoded.id;
       console.log('👤 Attempting to find User with ID:', userId);
 
       // CRITICAL: Fetch user from database and attach to req.user
