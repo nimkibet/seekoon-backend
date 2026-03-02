@@ -306,16 +306,22 @@ export const mpesaCallback = async (req, res) => {
             console.log(`✅ Order ${order._id} marked as paid!`);
 
             // Clear the user's cart ONLY when payment succeeds
-            if (order.user) {
+            // CRITICAL: Use order.user from the Order document, NOT req.user
+            // Safaricom webhooks do NOT send auth headers
+            if (order && order.user) {
               try {
+                const userId = order.user;
+                console.log(`🛒 Clearing cart for user: ${userId}`);
                 await Cart.findOneAndUpdate(
-                  { userId: order.user },
+                  { userId: userId },
                   { items: [], totalItems: 0, totalPrice: 0 }
                 );
-                console.log(`✅ Cart cleared for user ${order.user}!`);
+                console.log(`✅ Cart cleared for user ${userId}!`);
               } catch (cartError) {
                 console.error('⚠️ Error clearing cart:', cartError.message);
               }
+            } else {
+              console.log('⚠️ No user associated with order, skipping cart clear');
             }
             
             // Create admin notification for paid order
@@ -401,16 +407,22 @@ const processMpesaResult = async (resultCode, checkoutRequestID, amount, mpesaRe
         console.log(`✅ Order ${order._id} marked as paid via query!`);
         
         // Clear the user's cart ONLY when payment succeeds
-        if (order.user) {
+        // CRITICAL: Use order.user from the Order document, NOT req.user
+        // Safaricom webhooks do NOT send auth headers
+        if (order && order.user) {
           try {
+            const userId = order.user;
+            console.log(`🛒 Clearing cart for user via query: ${userId}`);
             await Cart.findOneAndUpdate(
-              { userId: order.user },
+              { userId: userId },
               { items: [], totalItems: 0, totalPrice: 0 }
             );
-            console.log(`✅ Cart cleared for user ${order.user} via query!`);
+            console.log(`✅ Cart cleared for user ${userId} via query!`);
           } catch (cartError) {
             console.error('⚠️ Error clearing cart:', cartError.message);
           }
+        } else {
+          console.log('⚠️ No user associated with order, skipping cart clear');
         }
         
         // Create admin notification for paid order
@@ -677,12 +689,22 @@ export const flutterwaveCallback = async (req, res) => {
           order.status = 'processing';
           await order.save();
           
-          // Clear cart
-          if (order.user) {
-            await Cart.findOneAndUpdate(
-              { userId: order.user },
-              { items: [], totalItems: 0, totalPrice: 0 }
-            );
+          // Clear cart - use order.user from Order document, NOT req.user
+          // Flutterwave webhooks do NOT send auth headers
+          if (order && order.user) {
+            try {
+              const userId = order.user;
+              console.log(`🛒 Clearing cart for Flutterwave user: ${userId}`);
+              await Cart.findOneAndUpdate(
+                { userId: userId },
+                { items: [], totalItems: 0, totalPrice: 0 }
+              );
+              console.log(`✅ Flutterwave cart cleared for user ${userId}!`);
+            } catch (cartError) {
+              console.error('⚠️ Error clearing Flutterwave cart:', cartError.message);
+            }
+          } else {
+            console.log('⚠️ No user associated with Flutterwave order, skipping cart clear');
           }
           
           // Create notification

@@ -24,7 +24,8 @@ router.post('/mpesa', authMiddleware, stkLimiter, initiateMpesaPayment);
 router.post('/mpesa/query', authMiddleware, queryMpesaTransaction);
 router.post('/flutterwave', authMiddleware, initiateFlutterwavePayment);
 
-// Callback routes - removed IP whitelist for Sandbox testing
+// Callback routes - NO auth middleware - Safaricom & Flutterwave do NOT send auth headers
+// These webhooks come directly from payment providers
 router.post('/mpesa-callback', mpesaCallback);
 router.get('/flutterwave-callback', flutterwaveCallback);
 
