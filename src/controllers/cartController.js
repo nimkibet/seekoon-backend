@@ -179,10 +179,13 @@ export const updateCartItemQuantity = async (req, res) => {
   try {
     // SECURITY: Check if user is authenticated
     if (!req.user || !req.user._id) {
+      console.error('🛒 UPDATE_QTY: Not authenticated, req.user:', req.user);
       return res.status(401).json({ success: false, message: 'Not authenticated' });
     }
     
     const { productId, size, color, quantity } = req.body;
+    console.log('🛒 UPDATE_QTY: Request for user:', req.user._id, 'product:', productId, 'qty:', quantity);
+    
     const cart = await Cart.findOne({ userId: req.user._id });
     
     if (!cart) {
@@ -204,10 +207,10 @@ export const updateCartItemQuantity = async (req, res) => {
       });
     }
     
-    // Find the item safely even if the product reference is broken
+    // Find the item safely - Cart model uses productId field
     const item = cart.items.find(i => {
-      // Get item identifier from productId, product, or internal _id
-      const itemProdId = i.productId ? i.productId.toString() : (i.product ? i.product.toString() : (i._id ? i._id.toString() : null));
+      // Get item identifier from productId (Cart model uses productId not product)
+      const itemProdId = i.productId ? i.productId.toString() : (i._id ? i._id.toString() : null);
       const targetProdId = productId ? productId.toString() : null;
       
       // If we can't determine the ID, skip this item
@@ -246,21 +249,24 @@ export const removeFromCart = async (req, res) => {
   try {
     // SECURITY: Check if user is authenticated
     if (!req.user || !req.user._id) {
+      console.error('🛒 REMOVE_ITEM: Not authenticated, req.user:', req.user);
       return res.status(401).json({ success: false, message: 'Not authenticated' });
     }
     
     const { productId } = req.body; // This is the ID passed from the trash icon
+    console.log('🛒 REMOVE_ITEM: Request for user:', req.user._id, 'product:', productId);
+    
     const cart = await Cart.findOne({ userId: req.user._id });
     
     if (!cart) {
       return res.status(404).json({ success: false, message: 'Cart not found' });
     }
     
-    // SAFE FILTER: Ensure we don't call .toString() on a null product field
+    // SAFE FILTER: Use productId field (Cart model uses productId not product)
     const initialLength = cart.items.length;
     cart.items = cart.items.filter(item => {
-      // Use product field if exists, otherwise fall back to internal _id
-      const itemIdentifier = item.product ? item.product.toString() : (item._id ? item._id.toString() : null);
+      // Cart model stores productId, not product
+      const itemIdentifier = item.productId ? item.productId.toString() : (item._id ? item._id.toString() : null);
       // Keep item if we can't determine its ID or if IDs don't match
       if (!itemIdentifier) return true;
       return itemIdentifier !== productId;
