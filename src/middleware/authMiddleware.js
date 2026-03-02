@@ -16,14 +16,18 @@ const protect = asyncHandler(async (req, res, next) => {
       
       console.log('🔐 Token decoded:', decoded);
 
+      // CRITICAL: Handle both 'id' and 'userId' for backward compatibility
+      const userId = decoded.id || decoded.userId;
+      console.log('👤 Attempting to find User with ID:', userId);
+
       // CRITICAL: Fetch user from database and attach to req.user
-      req.user = await User.findById(decoded.id).select('-password');
+      req.user = await User.findById(userId).select('-password');
       
       console.log('👤 User found:', req.user ? req.user.email : 'NULL');
 
       // CRITICAL: Ensure user exists before proceeding
       if (!req.user) {
-        console.error('🚨 User not found in database for token ID:', decoded.id);
+        console.error('🚨 User not found in database for ID:', userId);
         return res.status(401).json({ 
           success: false,
           message: 'User not found. Account may have been deleted.' 
