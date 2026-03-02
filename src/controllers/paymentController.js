@@ -12,7 +12,9 @@ const getMpesaAccessToken = async () => {
     const consumerSecret = process.env.CONSUMER_SECRET || process.env.DARAJA_CONSUMER_SECRET || process.env.MPESA_CONSUMER_SECRET;
     
     if (!consumerKey || !consumerSecret) {
-      throw new Error('M-Pesa credentials not configured. Please add CONSUMER_KEY and CONSUMER_SECRET to .env');
+      const error = new Error('M-Pesa credentials not configured. Please add CONSUMER_KEY and CONSUMER_SECRET to Railway environment variables.');
+      error.code = 'MPESA_NOT_CONFIGURED';
+      throw error;
     }
 
     // Check environment - use sandbox or production
@@ -232,6 +234,15 @@ export const initiateMpesaPayment = async (req, res) => {
     });
   } catch (error) {
     console.error('🚨 FATAL M-PESA CRASH CAUGHT:', error.stack || error);
+    
+    // Check for specific error codes to return more helpful messages
+    if (error.code === 'MPESA_NOT_CONFIGURED') {
+      return res.status(503).json({ 
+        success: false, 
+        message: 'M-Pesa payment is not configured on the server. Please contact support.' 
+      });
+    }
+    
     // Force a 400 Bad Request instead of a 500 crash, so the frontend gets the exact reason
     return res.status(400).json({ 
       success: false, 

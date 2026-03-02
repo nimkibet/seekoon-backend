@@ -94,6 +94,16 @@ app.get('/', (req, res) => {
   });
 });
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({
+    success: true,
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
 // API Routes
 app.use('/api', routes);
 
