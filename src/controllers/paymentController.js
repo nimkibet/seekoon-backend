@@ -86,6 +86,14 @@ export const initiateMpesaPayment = async (req, res) => {
       try {
         const order = await Order.findById(orderId);
         if (order) {
+          // Validate order items have valid product IDs
+          order.items.forEach((item, index) => {
+            const prodId = item.product?._id || item.product || item.productId;
+            if (!prodId) {
+              console.error(`🚨 Item at index ${index} is missing a Product ID! Item:`, item.name);
+            }
+          });
+          
           // Recalculate total from order items stored in database
           const calculatedTotal = order.items.reduce((sum, item) => {
             return sum + (item.price * item.quantity);

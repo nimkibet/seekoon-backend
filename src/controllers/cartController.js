@@ -202,45 +202,46 @@ export const removeFromCart = async (req, res) => {
     const userId = req.user._id;
     const { productId, size, color } = req.body;
     
-    // Input validation
-    if (!productId || !color) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Product ID and color are required' 
-      });
-    }
-    
     const cart = await Cart.findOne({ userId });
     if (!cart) {
       return res.status(404).json({ success: false, message: 'Cart not found' });
     }
     
-    // Filter out the specific item - with full null safety check
+    // Filter out the specific item - check multiple ID fields for bulletproof removal
     const initialLength = cart.items.length;
     try {
       cart.items = cart.items.filter(item => {
-        // Safely handle potential null/undefined fields
-        try {
-          const itemProdId = item.productId ? item.productId.toString() : null;
-          const targetProdId = productId ? productId.toString() : null;
-          const itemColor = item.color || '';
-          const targetColor = color || '';
-          const itemSize = item.size || null;
-          
-          // Skip comparison if either ID is missing/null
-          if (!itemProdId || !targetProdId) {
-            return true; // Keep item when comparison isn't possible
-          }
-          
+        // Safely get the item's product ID from multiple possible fields
+        let itemProdId = null;
+        
+        // Try different field names: productId, product, or the internal _id
+        if (item.productId) {
+          itemProdId = item.productId.toString();
+        } else if (item.product) {
+          itemProdId = item.product.toString();
+        } else if (item._id) {
+          // Last resort: use the internal item _id
+          itemProdId = item._id.toString();
+        }
+        
+        const targetProdId = productId ? productId.toString() : null;
+        
+        // If we can't determine the item's ID, keep it (safe default)
+        if (!itemProdId || !targetProdId) {
+          return true;
+        }
+        
+        // If size and color are provided, match all; otherwise just match ID
+        if (size !== undefined && color !== undefined) {
           return !(
             itemProdId === targetProdId &&
-            itemColor === targetColor &&
-            itemSize === (size || null)
+            item.color === color &&
+            item.size === (size || null)
           );
-        } catch (filterError) {
-          console.error('⚠️ Error filtering item:', filterError);
-          return true; // Keep item on error to prevent crash
         }
+        
+        // Simple ID-only matching as fallback
+        return itemProdId !== targetProdId;
       });
     } catch (filterError) {
       console.error('⚠️ Filter operation failed:', filterError);
