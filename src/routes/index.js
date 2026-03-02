@@ -7,6 +7,7 @@ import wishlistRoutes from './wishlistRoutes.js';
 import adminRoutes from './adminRoutes.js';
 import notificationRoutes from './notificationRoutes.js';
 import orderRoutes from './orderRoutes.js';
+import productRoutes from './productRoutes.js';
 import { 
   getAllProducts as getAllProductsPublic, 
   getProduct as getProductPublic 
@@ -24,8 +25,11 @@ router.use('/wishlist', wishlistRoutes);
 router.use('/admin', adminRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/orders', orderRoutes);
+router.use('/products', productRoutes);
 
 // Public product routes (no auth required for viewing)
+// Note: Individual product routes are handled by productRoutes.js
+// This is just a fallback for public GET
 router.get('/products', getAllProductsPublic);
 router.get('/products/:id', getProductPublic);
 
