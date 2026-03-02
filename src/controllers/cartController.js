@@ -198,55 +198,22 @@ export const updateCartItemQuantity = async (req, res) => {
 // @route   DELETE /api/cart/remove
 export const removeFromCart = async (req, res) => {
   try {
-    // SECURITY: Always use authenticated user's ID from token
-    const userId = req.user._id;
-    const { productId, size, color } = req.body;
+    const { productId } = req.body; // This is the ID passed from the trash icon
+    const cart = await Cart.findOne({ user: req.user._id });
     
-    const cart = await Cart.findOne({ userId });
     if (!cart) {
       return res.status(404).json({ success: false, message: 'Cart not found' });
     }
     
-    // Filter out the specific item - check multiple ID fields for bulletproof removal
+    // SAFE FILTER: Ensure we don't call .toString() on a null product field
     const initialLength = cart.items.length;
-    try {
-      cart.items = cart.items.filter(item => {
-        // Safely get the item's product ID from multiple possible fields
-        let itemProdId = null;
-        
-        // Try different field names: productId, product, or the internal _id
-        if (item.productId) {
-          itemProdId = item.productId.toString();
-        } else if (item.product) {
-          itemProdId = item.product.toString();
-        } else if (item._id) {
-          // Last resort: use the internal item _id
-          itemProdId = item._id.toString();
-        }
-        
-        const targetProdId = productId ? productId.toString() : null;
-        
-        // If we can't determine the item's ID, keep it (safe default)
-        if (!itemProdId || !targetProdId) {
-          return true;
-        }
-        
-        // If size and color are provided, match all; otherwise just match ID
-        if (size !== undefined && color !== undefined) {
-          return !(
-            itemProdId === targetProdId &&
-            item.color === color &&
-            item.size === (size || null)
-          );
-        }
-        
-        // Simple ID-only matching as fallback
-        return itemProdId !== targetProdId;
-      });
-    } catch (filterError) {
-      console.error('⚠️ Filter operation failed:', filterError);
-      return res.status(400).json({ success: false, message: 'Failed to remove item' });
-    }
+    cart.items = cart.items.filter(item => {
+      // Use product field if exists, otherwise fall back to internal _id
+      const itemIdentifier = item.product ? item.product.toString() : (item._id ? item._id.toString() : null);
+      // Keep item if we can't determine its ID or if IDs don't match
+      if (!itemIdentifier) return true;
+      return itemIdentifier !== productId;
+    });
     
     // Verify item was actually removed
     if (cart.items.length === initialLength) {
