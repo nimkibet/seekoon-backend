@@ -231,11 +231,11 @@ export const initiateMpesaPayment = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ M-Pesa payment error:', error.response?.data || error.message);
-    res.status(500).json({
-      success: false,
-      message: error.response?.data?.errorMessage || error.message || 'Failed to initiate M-Pesa payment',
-      error: error.response?.data || { message: error.message }
+    console.error('🚨 FATAL M-PESA CRASH CAUGHT:', error.stack || error);
+    // Force a 400 Bad Request instead of a 500 crash, so the frontend gets the exact reason
+    return res.status(400).json({ 
+      success: false, 
+      message: `Checkout Error: ${error.message}` 
     });
   }
 };
