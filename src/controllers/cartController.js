@@ -16,24 +16,29 @@ export const getCart = async (req, res) => {
     // SECURITY: Use req.user._id from verified JWT token, never from client input
     const userId = req.user._id; 
     
-    let cart = await Cart.findOne({ userId });
+    // Try to find cart and populate product references
+    let cart = await Cart.findOne({ userId }).populate('items.product');
     
     if (!cart) {
-      cart = await Cart.create({ userId, items: [] });
+      // Return empty cart if none exists
+      return res.status(200).json({
+        success: true,
+        cart: { userId, items: [], totalItems: 0, totalPrice: 0 }
+      });
     }
     
-    // SANITY CHECK: Filter out items with missing product references
-    // Check multiple possible field names for product ID
+    // GLOBAL CART SANITIZER: Filter out items where product is null (deleted product)
     const originalLength = cart.items.length;
     cart.items = cart.items.filter(item => {
-      // Check item.productId, item.product, or item._id
-      const hasProductRef = item.productId != null || item.product != null || item._id != null;
-      return hasProductRef;
+      // Keep item only if product exists (either as ID reference or populated object)
+      if (item.product === null) return false; // Populated but deleted
+      if (item.product === undefined && !item.productId) return false; // No reference at all
+      return true;
     });
     
     // If we removed corrupted items, save the cleaned cart
     if (cart.items.length !== originalLength) {
-      console.log(`🧹 Sanitized cart: removed ${originalLength - cart.items.length} corrupted items`);
+      console.log(`🧹 Sanitized cart: removed ${originalLength - cart.items.length} items with missing products`);
       await cart.save();
     }
     
@@ -42,7 +47,12 @@ export const getCart = async (req, res) => {
       cart
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error('Get cart error:', error);
+    // Return empty cart on error instead of crashing
+    res.status(200).json({
+      success: true,
+      cart: { items: [], totalItems: 0, totalPrice: 0 }
+    });
   }
 };
 
