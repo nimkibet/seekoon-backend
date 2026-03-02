@@ -17,6 +17,16 @@ export const getCart = async (req, res) => {
       cart = await Cart.create({ userId, items: [] });
     }
     
+    // SANITY CHECK: Filter out items with missing product references
+    const originalLength = cart.items.length;
+    cart.items = cart.items.filter(item => item.productId != null);
+    
+    // If we removed corrupted items, save the cleaned cart
+    if (cart.items.length !== originalLength) {
+      console.log(`🧹 Sanitized cart: removed ${originalLength - cart.items.length} corrupted items`);
+      await cart.save();
+    }
+    
     res.status(200).json({
       success: true,
       cart
