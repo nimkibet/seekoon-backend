@@ -135,16 +135,11 @@ export const addToCart = async (req, res) => {
 // @route   PATCH /api/cart/update
 export const updateCartItemQuantity = async (req, res) => {
   try {
-    // SECURITY: Always use authenticated user's ID from token
-    const userId = req.user._id;
     const { productId, size, color, quantity } = req.body;
+    const cart = await Cart.findOne({ user: req.user._id });
     
-    // Input validation
-    if (!productId || !color) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Product ID and color are required' 
-      });
+    if (!cart) {
+      return res.status(404).json({ success: false, message: 'Cart not found' });
     }
     
     // Validate quantity
@@ -162,17 +157,21 @@ export const updateCartItemQuantity = async (req, res) => {
       });
     }
     
-    const cart = await Cart.findOne({ userId });
-    if (!cart) {
-      return res.status(404).json({ success: false, message: 'Cart not found' });
-    }
-    
-    // Find the specific item
-    const item = cart.items.find(item => 
-      item.productId.toString() === productId &&
-      item.color === color &&
-      item.size === (size || null)
-    );
+    // Find the item safely even if the product reference is broken
+    const item = cart.items.find(i => {
+      // Get item identifier from productId, product, or internal _id
+      const itemProdId = i.productId ? i.productId.toString() : (i.product ? i.product.toString() : (i._id ? i._id.toString() : null));
+      const targetProdId = productId ? productId.toString() : null;
+      
+      // If we can't determine the ID, skip this item
+      if (!itemProdId || !targetProdId) return false;
+      
+      // Match on ID and optionally color/size
+      if (color !== undefined && size !== undefined) {
+        return itemProdId === targetProdId && i.color === color && i.size === (size || null);
+      }
+      return itemProdId === targetProdId;
+    });
     
     if (!item) {
       return res.status(404).json({ success: false, message: 'Item not found in cart' });
