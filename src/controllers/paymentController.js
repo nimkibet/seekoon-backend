@@ -130,6 +130,27 @@ export const initiateMpesaPayment = async (req, res) => {
     // Generate reference - will be used to create Transaction upon successful payment
     const reference = `MPESA${Date.now()}${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
 
+    // 3. Get order items for transaction description (if orderId provided)
+    let itemNames = 'Seekon Purchase';
+    if (orderId) {
+      try {
+        const order = await Order.findById(orderId);
+        if (order && order.items && order.items.length > 0) {
+          // Create a summary string from item names
+          const names = order.items.map(i => i.name).filter(n => n);
+          if (names.length > 0) {
+            itemNames = names.join(', ');
+            // Truncate to 30 chars max for M-Pesa
+            if (itemNames.length > 30) {
+              itemNames = itemNames.substring(0, 27) + '...';
+            }
+          }
+        }
+      } catch (orderError) {
+        console.error('⚠️ Error fetching order for transaction desc:', orderError.message);
+      }
+    }
+
     // Check if credentials are set up
     const hasCredentials = 
       (process.env.CONSUMER_KEY || process.env.DARAJA_CONSUMER_KEY || process.env.MPESA_CONSUMER_KEY) &&
@@ -184,7 +205,7 @@ export const initiateMpesaPayment = async (req, res) => {
       PhoneNumber: formattedPhone,
       CallBackURL: CallBackURL,
       AccountReference: reference,
-      TransactionDesc: 'Seekon Apparel Purchase'
+      TransactionDesc: `Pay for: ${itemNames}`
     };
 
     console.log('🚀 Payload being sent to Safaricom:', JSON.stringify(stkPushData, null, 2));

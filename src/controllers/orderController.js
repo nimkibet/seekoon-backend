@@ -45,6 +45,15 @@ export const createOrder = async (req, res) => {
     // Cart items use productId, Order uses product
     console.log("🛒 BEFORE MAPPING - Raw Cart Items:", JSON.stringify(items));
     
+    // Validate that we have items
+    if (!items || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No order items found'
+      });
+    }
+    
+    // Ensure every single item in the loop gets its product ID attached
     const orderItems = items.map(item => {
       // Aggressively grab the ID whether it's populated or raw
       const extractedId = item.product?._id || item.product || item.productId?._id || item.productId || item.id || item._id;
