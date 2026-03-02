@@ -51,6 +51,7 @@ app.options('*', cors({
 const allowedOrigins = [
   'https://www.seek-on.app',
   'https://seek-on.app',
+  'https://seekoon-backend-production.up.railway.app',
   'http://localhost:5173',
   'http://localhost:5177',
   'http://localhost:3000',
