@@ -38,17 +38,28 @@ export const createOrder = async (req, res) => {
       postalCode: shippingAddress.zipCode
     } : {};
 
-    // CRITICAL FIX: Map productId from cart to product in order
-    // Cart uses productId, Order uses product
-    const orderItems = items.map(item => ({
-      product: item.product || item.productId || item.id || item._id, // Cart items have productId, not product
-      name: item.name,
-      price: item.price,
-      quantity: item.quantity,
-      image: item.image,
-      size: item.size,
-      color: item.color
-    }));
+    // CRITICAL FIX: Map productId from cart to product in order with aggressive logging
+    // Cart items use productId, Order uses product
+    console.log("🛒 CRITICAL LOG - Raw Cart Items:", JSON.stringify(items));
+    
+    const orderItems = items.map(item => {
+      // Force the extraction - check all possible field names
+      const productRef = item.product || item.productId || item.id || item._id;
+      
+      if (!productRef) {
+        console.error("🚨 FATAL: Cart item is missing product ID!", item);
+      }
+      
+      return {
+        product: productRef, // Force the extraction
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        size: item.size,
+        color: item.color,
+        image: item.image
+      };
+    });
     
     console.log('🔍 Creating order with items:', JSON.stringify(orderItems, null, 2));
 

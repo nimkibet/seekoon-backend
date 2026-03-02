@@ -11,17 +11,17 @@ const orderSchema = new mongoose.Schema({
     required: false
   },
   items: [{
-    product: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Product',
-      required: false // Optional - may not have valid ID for cart items
+    product: { 
+      type: mongoose.Schema.Types.ObjectId, 
+      ref: 'Product', 
+      required: [true, 'Product ID is strictly required for order items']
     },
-    name: String,
-    price: Number,
-    quantity: Number,
+    name: { type: String, required: true },
+    price: { type: Number, required: true },
+    quantity: { type: Number, required: true },
     size: String,
-    color: String,
-    image: String
+    color: { type: String, required: true },
+    image: { type: String, required: true }
   }],
   totalAmount: {
     type: Number,
