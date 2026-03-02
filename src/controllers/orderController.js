@@ -196,9 +196,13 @@ export const updateOrderStatus = async (req, res) => {
   try {
     const { status, expectedArrival, deliveryDetails } = req.body;
 
+    // Force the incoming status to lowercase
+    const newStatus = status ? status.toLowerCase() : null;
+    console.log("🔥 Attempting to update order to:", newStatus);
+
     // Build update object dynamically
     const updateData = {};
-    if (status) updateData.status = status;
+    if (newStatus) updateData.status = newStatus;
     if (expectedArrival !== undefined) updateData.expectedArrival = expectedArrival;
     if (deliveryDetails !== undefined) updateData.deliveryDetails = deliveryDetails;
 
@@ -220,7 +224,7 @@ export const updateOrderStatus = async (req, res) => {
       action: 'order_updated',
       actor: req.admin?.email || 'system',
       actorType: 'admin',
-      details: { orderId: order._id, status },
+      details: { orderId: order._id, status: newStatus },
       module: 'order'
     });
 
