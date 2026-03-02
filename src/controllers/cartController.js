@@ -8,6 +8,11 @@ const MAX_QUANTITY_PER_ITEM = 99;
 // @route   GET /api/cart
 export const getCart = async (req, res) => {
   try {
+    // SECURITY: Check if user is authenticated
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ success: false, message: 'Not authenticated' });
+    }
+    
     // SECURITY: Use req.user._id from verified JWT token, never from client input
     const userId = req.user._id; 
     
@@ -45,6 +50,11 @@ export const getCart = async (req, res) => {
 // @route   POST /api/cart/add
 export const addToCart = async (req, res) => {
   try {
+    // SECURITY: Check if user is authenticated
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ success: false, message: 'Not authenticated' });
+    }
+    
     // SECURITY: Always use authenticated user's ID from token
     const userId = req.user._id;
     // Check for product ID in multiple formats
@@ -150,8 +160,13 @@ export const addToCart = async (req, res) => {
 // @route   PATCH /api/cart/update
 export const updateCartItemQuantity = async (req, res) => {
   try {
+    // SECURITY: Check if user is authenticated
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ success: false, message: 'Not authenticated' });
+    }
+    
     const { productId, size, color, quantity } = req.body;
-    const cart = await Cart.findOne({ user: req.user._id });
+    const cart = await Cart.findOne({ userId: req.user._id });
     
     if (!cart) {
       return res.status(404).json({ success: false, message: 'Cart not found' });
@@ -212,8 +227,13 @@ export const updateCartItemQuantity = async (req, res) => {
 // @route   DELETE /api/cart/remove
 export const removeFromCart = async (req, res) => {
   try {
+    // SECURITY: Check if user is authenticated
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ success: false, message: 'Not authenticated' });
+    }
+    
     const { productId } = req.body; // This is the ID passed from the trash icon
-    const cart = await Cart.findOne({ user: req.user._id });
+    const cart = await Cart.findOne({ userId: req.user._id });
     
     if (!cart) {
       return res.status(404).json({ success: false, message: 'Cart not found' });
@@ -246,6 +266,11 @@ export const removeFromCart = async (req, res) => {
 // @route   DELETE /api/cart/clear
 export const clearCart = async (req, res) => {
   try {
+    // SECURITY: Check if user is authenticated
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ success: false, message: 'Not authenticated' });
+    }
+    
     // SECURITY: Always use authenticated user's ID from token
     const userId = req.user._id;
     const cart = await Cart.findOne({ userId });
