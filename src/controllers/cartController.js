@@ -256,7 +256,7 @@ export const removeFromCart = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Not authenticated' });
     }
     
-    const { productId } = req.body; // This is the ID passed from the trash icon
+    const { productId } = req.params; // This is the ID passed from the trash icon
     console.log('🛒 REMOVE_ITEM: Request for user:', req.user._id, 'product:', productId);
     
     const cart = await Cart.findOne({ userId: req.user._id });
