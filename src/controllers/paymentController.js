@@ -299,7 +299,7 @@ export const mpesaCallback = async (req, res) => {
                 status: 'Completed',
                 email_address: phoneNumber
               };
-              order.status = 'completed';
+              order.status = 'processing';
               await order.save();
               console.log(`✅ Order ${order._id} marked as paid!`);
               
@@ -377,7 +377,7 @@ const processMpesaResult = async (resultCode, checkoutRequestID, amount, mpesaRe
             status: 'Completed',
             email_address: phoneNumber
           };
-          order.status = 'completed';
+          order.status = 'processing';
           await order.save();
           console.log(`✅ Order ${order._id} marked as paid via query!`);
           
