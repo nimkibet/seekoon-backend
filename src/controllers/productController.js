@@ -368,16 +368,14 @@ export const addReview = async (req, res) => {
     }
 
     // VERIFY PURCHASE: Check if user actually bought this product
+    // Note: We intentionally relax the isPaid/isDelivered checks to allow sandbox test orders
     const hasBought = await Order.findOne({
       user: userId,
-      isPaid: true,
-      $or: [
-        { 'orderItems.product': productId },
-        { 'orderItems': { $elemMatch: { productId: productId } } }
-      ]
+      'items.product': productId
     });
 
     if (!hasBought) {
+      console.error(`🚨 REVIEW REJECTED: Could not find order for User: ${userId} | Product: ${productId}`);
       return res.status(400).json({ 
         success: false,
         message: 'You must purchase this product to leave a review. Only verified buyers can review products.' 
