@@ -215,24 +215,37 @@ export const removeFromCart = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Cart not found' });
     }
     
-    // Filter out the specific item - with null safety check
+    // Filter out the specific item - with full null safety check
     const initialLength = cart.items.length;
-    cart.items = cart.items.filter(item => {
-      // Safely handle potential null/undefined productId
-      const itemProdId = item.productId ? item.productId.toString() : null;
-      const targetProdId = productId ? productId.toString() : null;
-      
-      // Skip comparison if either ID is missing/null
-      if (!itemProdId || !targetProdId) {
-        return true; // Keep item when comparison isn't possible
-      }
-      
-      return !(
-        itemProdId === targetProdId &&
-        item.color === color &&
-        item.size === (size || null)
-      );
-    });
+    try {
+      cart.items = cart.items.filter(item => {
+        // Safely handle potential null/undefined fields
+        try {
+          const itemProdId = item.productId ? item.productId.toString() : null;
+          const targetProdId = productId ? productId.toString() : null;
+          const itemColor = item.color || '';
+          const targetColor = color || '';
+          const itemSize = item.size || null;
+          
+          // Skip comparison if either ID is missing/null
+          if (!itemProdId || !targetProdId) {
+            return true; // Keep item when comparison isn't possible
+          }
+          
+          return !(
+            itemProdId === targetProdId &&
+            itemColor === targetColor &&
+            itemSize === (size || null)
+          );
+        } catch (filterError) {
+          console.error('⚠️ Error filtering item:', filterError);
+          return true; // Keep item on error to prevent crash
+        }
+      });
+    } catch (filterError) {
+      console.error('⚠️ Filter operation failed:', filterError);
+      return res.status(400).json({ success: false, message: 'Failed to remove item' });
+    }
     
     // Verify item was actually removed
     if (cart.items.length === initialLength) {
