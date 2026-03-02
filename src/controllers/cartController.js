@@ -16,6 +16,8 @@ export const getCart = async (req, res) => {
     // SECURITY: Use req.user._id from verified JWT token, never from client input
     const userId = req.user._id; 
     
+    console.log('🛒 FETCH_CART: Request for userId:', userId);
+    
     // Try to find cart and populate product references
     // Note: Cart model uses 'productId' not 'product'
     let cart = await Cart.findOne({ userId }).populate({
@@ -23,12 +25,12 @@ export const getCart = async (req, res) => {
       select: 'name price image category countInStock brand'
     });
     
+    console.log('🛒 FETCH_CART: Raw cart result:', cart ? `Found with ${cart.items.length} items` : 'NULL');
+    
     if (!cart) {
-      // Return empty cart if none exists
-      return res.status(200).json({
-        success: true,
-        cart: { userId, items: [], totalItems: 0, totalPrice: 0 }
-      });
+      // Create empty cart for user and return it
+      console.log('🛒 FETCH_CART: Creating empty cart for user:', userId);
+      cart = await Cart.create({ userId, items: [], totalItems: 0, totalPrice: 0 });
     }
     
     // GLOBAL CART SANITIZER: Filter out items where product is null (deleted product)
@@ -50,10 +52,11 @@ export const getCart = async (req, res) => {
       success: true,
       cart
     });
+    console.log('🛒 FETCH_CART: Returning cart with', cart.items.length, 'items');
   } catch (error) {
-    console.error('Get cart error:', error);
+    console.error('🛒 FETCH_CART: Error:', error.message);
     // Return empty cart on error instead of crashing
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       cart: { items: [], totalItems: 0, totalPrice: 0 }
     });
