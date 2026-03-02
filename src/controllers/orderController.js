@@ -40,18 +40,18 @@ export const createOrder = async (req, res) => {
 
     // CRITICAL FIX: Map productId from cart to product in order with aggressive logging
     // Cart items use productId, Order uses product
-    console.log("🛒 CRITICAL LOG - Raw Cart Items:", JSON.stringify(items));
+    console.log("🛒 BEFORE MAPPING - Raw Cart Items:", JSON.stringify(items));
     
     const orderItems = items.map(item => {
-      // Force the extraction - check all possible field names
-      const productRef = item.product || item.productId || item.id || item._id;
+      // Aggressively grab the ID whether it's populated or raw
+      const extractedId = item.product?._id || item.product || item.productId?._id || item.productId || item.id || item._id;
       
-      if (!productRef) {
-        console.error("🚨 FATAL: Cart item is missing product ID!", item);
+      if (!extractedId) {
+        console.error("🚨 FATAL MAPPING ERROR: Missing ID for item:", item.name);
       }
       
       return {
-        product: productRef, // Force the extraction
+        product: extractedId, // THE FIX - ensure we always have an ID
         name: item.name,
         price: item.price,
         quantity: item.quantity,
@@ -61,7 +61,7 @@ export const createOrder = async (req, res) => {
       };
     });
     
-    console.log('🔍 Creating order with items:', JSON.stringify(orderItems, null, 2));
+    console.log("✅ AFTER MAPPING - Order Items to Save:", JSON.stringify(orderItems));
 
     const order = await Order.create({
       user: userId, // Can be null for guest checkout
@@ -94,7 +94,7 @@ export const createOrder = async (req, res) => {
       order
     });
   } catch (error) {
-    console.error('Error creating order:', error);
+    console.error('❌ ORDER CREATION FAILED:', error.message || error);
     res.status(500).json({
       success: false,
       message: 'Failed to create order'
