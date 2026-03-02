@@ -256,6 +256,15 @@ export const canUserReview = async (req, res) => {
   try {
     // Support both req.params.id and req.body.productId
     const productId = req.params.id || req.body.productId;
+    
+    // CRITICAL: Ensure user is authenticated
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ 
+        success: false,
+        message: 'Authentication required. Please log in.' 
+      });
+    }
+    
     const userId = req.user._id;
 
     if (!productId) {
@@ -334,6 +343,14 @@ export const addReview = async (req, res) => {
       return res.status(400).json({ 
         success: false,
         message: 'Product ID is required' 
+      });
+    }
+    
+    // CRITICAL: Ensure user is authenticated
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ 
+        success: false,
+        message: 'Authentication required. Please log in.' 
       });
     }
     

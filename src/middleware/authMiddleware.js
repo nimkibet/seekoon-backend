@@ -13,20 +13,37 @@ const protect = asyncHandler(async (req, res, next) => {
       token = req.headers.authorization.split(' ')[1];
 
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      
+      console.log('🔐 Token decoded:', decoded);
 
+      // CRITICAL: Fetch user from database and attach to req.user
       req.user = await User.findById(decoded.id).select('-password');
+      
+      console.log('👤 User found:', req.user ? req.user.email : 'NULL');
+
+      // CRITICAL: Ensure user exists before proceeding
+      if (!req.user) {
+        console.error('🚨 User not found in database for token ID:', decoded.id);
+        return res.status(401).json({ 
+          success: false,
+          message: 'User not found. Account may have been deleted.' 
+        });
+      }
 
       next();
     } catch (error) {
-      console.error(error);
-      res.status(401);
-      throw new Error('Not authorized, token failed');
+      console.error('🔥 Token Verification Failed:', error.message);
+      return res.status(401).json({ 
+        success: false,
+        message: 'Not authorized, token failed' 
+      });
     }
-  }
-
-  if (!token) {
-    res.status(401);
-    throw new Error('Not authorized, no token');
+  } else {
+    console.error('🚨 No token provided in request');
+    return res.status(401).json({ 
+      success: false,
+      message: 'Not authorized, no token' 
+    });
   }
 });
 
