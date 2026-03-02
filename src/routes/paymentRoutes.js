@@ -9,7 +9,6 @@ import {
   queryMpesaTransaction
 } from '../controllers/paymentController.js';
 import { authMiddleware } from '../middleware/auth.js';
-import { safaricomIpWhitelist } from '../middleware/safaricomIpWhitelist.js';
 
 const router = express.Router();
 

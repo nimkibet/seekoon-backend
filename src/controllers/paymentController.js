@@ -169,8 +169,8 @@ export const initiateMpesaPayment = async (req, res) => {
     // STK Push request
     const shortcode = process.env.SHORTCODE || process.env.DARAJA_BUSINESS_SHORTCODE || process.env.MPESA_SHORTCODE;
     
-    // HARDCODED: TEMPORARY TEST - Route STK Push callbacks to webhook.site for testing
-    const CallBackURL = 'https://webhook.site/63647568-8f3b-42dd-951d-0bb0aac87cc2';
+    // PRODUCTION: Use Railway callback URL
+    const CallBackURL = 'https://seekoon-backend-production.up.railway.app/api/payment/mpesa-callback';
     console.log('🎯 Using CallBackURL:', CallBackURL);
 
     // Determine base URL based on environment
@@ -257,6 +257,9 @@ export const initiateMpesaPayment = async (req, res) => {
 
 // M-Pesa Callback
 export const mpesaCallback = async (req, res) => {
+  console.log("🔥 ALERT: DARAJA CALLBACK HIT THE SERVER!");
+  console.log("📦 RAW PAYLOAD:", JSON.stringify(req.body, null, 2));
+  console.log("📋 HEADERS:", JSON.stringify(req.headers, null, 2));
   try {
     const callbackData = req.body;
     console.log('📥 M-Pesa Callback Received:', JSON.stringify(callbackData));
