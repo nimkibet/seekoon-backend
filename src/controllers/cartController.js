@@ -215,13 +215,24 @@ export const removeFromCart = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Cart not found' });
     }
     
-    // Filter out the specific item
+    // Filter out the specific item - with null safety check
     const initialLength = cart.items.length;
-    cart.items = cart.items.filter(item => !(
-      item.productId.toString() === productId &&
-      item.color === color &&
-      item.size === (size || null)
-    ));
+    cart.items = cart.items.filter(item => {
+      // Safely handle potential null/undefined productId
+      const itemProdId = item.productId ? item.productId.toString() : null;
+      const targetProdId = productId ? productId.toString() : null;
+      
+      // Skip comparison if either ID is missing/null
+      if (!itemProdId || !targetProdId) {
+        return true; // Keep item when comparison isn't possible
+      }
+      
+      return !(
+        itemProdId === targetProdId &&
+        item.color === color &&
+        item.size === (size || null)
+      );
+    });
     
     // Verify item was actually removed
     if (cart.items.length === initialLength) {
