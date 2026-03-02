@@ -254,8 +254,16 @@ export const deleteProduct = async (req, res) => {
 // Check if user can review a product (must have purchased it)
 export const canUserReview = async (req, res) => {
   try {
-    const productId = req.params.id;
+    // Support both req.params.id and req.body.productId
+    const productId = req.params.id || req.body.productId;
     const userId = req.user._id;
+
+    if (!productId) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Product ID is required' 
+      });
+    }
 
     // Check if user already reviewed this product
     const product = await Product.findById(productId);
@@ -315,8 +323,20 @@ export const canUserReview = async (req, res) => {
 // Add a review to a product
 export const addReview = async (req, res) => {
   try {
+    // Debug logging to trace the productId
+    console.log("🔥 Review Req Params:", req.params, "Body:", req.body);
+    
     const { rating, comment } = req.body;
-    const productId = req.params.id;
+    // Support both req.params.id and req.body.productId for flexibility
+    const productId = req.params.id || req.body.productId;
+    
+    if (!productId) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Product ID is required' 
+      });
+    }
+    
     const userId = req.user._id;
     const userName = req.user.name || req.user.email;
 
@@ -332,7 +352,7 @@ export const addReview = async (req, res) => {
     if (!product) {
       return res.status(404).json({ 
         success: false,
-        message: 'Product not found' 
+        message: "Can't find product info in DB." 
       });
     }
 
