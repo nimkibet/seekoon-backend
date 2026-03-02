@@ -348,6 +348,190 @@ export const mpesaCallback = async (req, res) => {
   }
 };
 
+// M-Pesa STK Push Query - Fallback to check transaction status
+const processMpesaResult = async (resultCode, checkoutRequestID, amount, mpesaReceipt, phoneNumber) => {
+  if (resultCode === 0 || resultCode === '0') {
+    // Payment successful - find and update transaction
+    const transaction = await Transaction.findOne({
+      'mpesaResponse.CheckoutRequestID': checkoutRequestID
+    });
+
+    if (transaction) {
+      console.log(`✅ Query: Payment SUCCESS! Receipt: ${mpesaReceipt}, Amount: ${amount}, Phone: ${phoneNumber}`);
+      
+      transaction.status = 'completed';
+      transaction.callbackData = { ResultCode: resultCode, ResultDesc: 'Success via query' };
+      await transaction.save();
+
+      // Also update the order if it exists
+      try {
+        const order = await Order.findOne({ mpesaCheckoutRequestId: checkoutRequestID });
+        if (order) {
+          order.isPaid = true;
+          order.paidAt = new Date();
+          order.paymentResult = {
+            id: mpesaReceipt,
+            status: 'Completed',
+            email_address: phoneNumber
+          };
+          order.status = 'completed';
+          await order.save();
+          console.log(`✅ Order ${order._id} marked as paid via query!`);
+          
+          // Create admin notification for paid order
+          try {
+            await Notification.create({
+              type: 'NEW_ORDER',
+              message: `Payment received! Order paid: KSh ${amount || order.totalAmount}`,
+              orderId: order._id
+            });
+            console.log('✅ Admin notification created for paid order via query!');
+          } catch (notifError) {
+            console.error('⚠️ Error creating notification:', notifError.message);
+          }
+        }
+      } catch (orderError) {
+        console.error('⚠️ Error updating order:', orderError.message);
+      }
+      return true;
+    }
+  } else {
+    // Payment failed
+    console.log(`❌ Query: Payment FAILED (Code: ${resultCode})`);
+    const transaction = await Transaction.findOne({
+      'mpesaResponse.CheckoutRequestID': checkoutRequestID
+    });
+    
+    if (transaction) {
+      transaction.status = 'failed';
+      transaction.callbackData = { ResultCode: resultCode, ResultDesc: 'Failed via query' };
+      await transaction.save();
+
+      // Update order status to cancelled
+      try {
+        const order = await Order.findOne({ mpesaCheckoutRequestId: checkoutRequestID });
+        if (order) {
+          order.status = 'cancelled';
+          await order.save();
+          console.log(`❌ Order ${order._id} marked as cancelled via query!`);
+        }
+      } catch (orderError) {
+        console.error('⚠️ Error updating order:', orderError.message);
+      }
+    }
+    return false;
+  }
+};
+
+// M-Pesa STK Push Query API
+export const queryMpesaTransaction = async (req, res) => {
+  try {
+    const { checkoutRequestId, orderId } = req.body;
+
+    if (!checkoutRequestId) {
+      return res.status(400).json({
+        success: false,
+        message: 'CheckoutRequestID is required'
+      });
+    }
+
+    console.log('🔍 Querying M-Pesa transaction:', { checkoutRequestId, orderId });
+
+    // Check if credentials are set up
+    const hasCredentials = 
+      (process.env.CONSUMER_KEY || process.env.DARAJA_CONSUMER_KEY || process.env.MPESA_CONSUMER_KEY) &&
+      (process.env.CONSUMER_SECRET || process.env.DARAJA_CONSUMER_SECRET || process.env.MPESA_CONSUMER_SECRET) &&
+      (process.env.SHORTCODE || process.env.DARAJA_BUSINESS_SHORTCODE || process.env.MPESA_SHORTCODE);
+
+    if (!hasCredentials) {
+      return res.status(400).json({
+        success: false,
+        message: 'M-Pesa credentials not configured'
+      });
+    }
+
+    // Get access token
+    const accessToken = await getMpesaAccessToken();
+
+    // Generate password
+    const { password, timestamp } = generatePassword();
+
+    // Determine environment and base URL
+    const isSandbox = process.env.MPESA_ENVIRONMENT === 'sandbox';
+    const shortcode = process.env.SHORTCODE || process.env.DARAJA_BUSINESS_SHORTCODE || process.env.MPESA_SHORTCODE;
+
+    // STK Query request
+    const queryUrl = isSandbox
+      ? 'https://sandbox.safaricom.co.ke/mpesa/stkpushquery/v1/query'
+      : 'https://api.safaricom.co.ke/mpesa/stkpushquery/v1/query';
+
+    const queryData = {
+      BusinessShortCode: shortcode,
+      Password: password,
+      Timestamp: timestamp,
+      CheckoutRequestID: checkoutRequestId
+    };
+
+    console.log('🔍 Sending STK Query request:', queryData);
+
+    const response = await axios.post(
+      queryUrl,
+      queryData,
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    console.log('📥 STK Query response:', response.data);
+
+    const resultCode = response.data.ResultCode;
+    let amount = null;
+    let mpesaReceipt = null;
+    let phoneNumber = null;
+
+    // Extract metadata if payment was successful
+    if (response.data.CallbackMetadata) {
+      const meta = response.data.CallbackMetadata.Item || [];
+      amount = meta.find(item => item.Name === 'Amount')?.Value;
+      mpesaReceipt = meta.find(item => item.Name === 'MpesaReceiptNumber')?.Value;
+      phoneNumber = meta.find(item => item.Name === 'PhoneNumber')?.Value;
+    }
+
+    // Process the result
+    const isSuccess = await processMpesaResult(resultCode, checkoutRequestId, amount, mpesaReceipt, phoneNumber);
+
+    if (resultCode === 0 || resultCode === '0') {
+      return res.status(200).json({
+        success: true,
+        message: 'Payment verified successfully',
+        data: {
+          status: 'success',
+          receiptNumber: mpesaReceipt,
+          amount: amount
+        }
+      });
+    } else {
+      return res.status(200).json({
+        success: false,
+        message: response.data.ResultDesc || 'Payment not found or failed',
+        data: {
+          status: 'failed',
+          resultCode: resultCode
+        }
+      });
+    }
+  } catch (error) {
+    console.error('❌ M-Pesa query error:', error.response?.data || error.message);
+    res.status(500).json({
+      success: false,
+      message: error.response?.data?.errorMessage || error.message || 'Failed to query M-Pesa transaction'
+    });
+  }
+};
+
 // Flutterwave Payment
 export const initiateFlutterwavePayment = async (req, res) => {
   try {

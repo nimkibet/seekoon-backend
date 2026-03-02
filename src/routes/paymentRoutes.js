@@ -5,7 +5,8 @@ import {
   initiateFlutterwavePayment,
   mpesaCallback,
   flutterwaveCallback,
-  getUserTransactions
+  getUserTransactions,
+  queryMpesaTransaction
 } from '../controllers/paymentController.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { safaricomIpWhitelist } from '../middleware/safaricomIpWhitelist.js';
@@ -21,6 +22,7 @@ const stkLimiter = rateLimit({
 
 // All payment routes except callbacks require authentication
 router.post('/mpesa', authMiddleware, stkLimiter, initiateMpesaPayment);
+router.post('/mpesa/query', authMiddleware, queryMpesaTransaction);
 router.post('/flutterwave', authMiddleware, initiateFlutterwavePayment);
 
 // Callback routes - removed IP whitelist for Sandbox testing
