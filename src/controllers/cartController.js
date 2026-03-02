@@ -18,8 +18,13 @@ export const getCart = async (req, res) => {
     }
     
     // SANITY CHECK: Filter out items with missing product references
+    // Check multiple possible field names for product ID
     const originalLength = cart.items.length;
-    cart.items = cart.items.filter(item => item.productId != null);
+    cart.items = cart.items.filter(item => {
+      // Check item.productId, item.product, or item._id
+      const hasProductRef = item.productId != null || item.product != null || item._id != null;
+      return hasProductRef;
+    });
     
     // If we removed corrupted items, save the cleaned cart
     if (cart.items.length !== originalLength) {
