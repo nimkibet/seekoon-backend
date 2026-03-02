@@ -32,7 +32,14 @@ export const addToCart = async (req, res) => {
   try {
     // SECURITY: Always use authenticated user's ID from token
     const userId = req.user._id;
-    const { productId, size, color, quantity } = req.body;
+    // Check for product ID in multiple formats
+    let { productId, size, color, quantity } = req.body;
+    
+    // If productId is missing, try other common field names
+    if (!productId) {
+      productId = req.body.product || req.body.id;
+      console.log("🔍 Alternative product ID lookup:", productId);
+    }
     
     // Input validation
     if (!productId) {
