@@ -5,6 +5,9 @@ import Notification from '../models/Notification.js';
 // Create Order
 export const createOrder = async (req, res) => {
   try {
+    // Log the incoming payload to see what frontend actually sent
+    console.log("🔥 INCOMING ORDER REQUEST BODY:", JSON.stringify(req.body, null, 2));
+    
     const {
       items,
       totalAmount,
@@ -94,11 +97,9 @@ export const createOrder = async (req, res) => {
       order
     });
   } catch (error) {
-    console.error('❌ ORDER CREATION FAILED:', error.message || error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to create order'
-    });
+    console.error('❌ Mongoose Validation Failed:', error);
+    // Send 400 Bad Request with the exact error message instead of crashing with 500
+    return res.status(400).json({ success: false, message: error.message }); 
   }
 };
 
