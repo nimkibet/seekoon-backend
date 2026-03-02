@@ -142,7 +142,12 @@ export const getMyOrders = async (req, res) => {
       });
     }
     
-    const orders = await Order.find({ user: userId })
+    // Only fetch paid/completed orders - exclude pending/unpaid checkouts
+    const orders = await Order.find({ 
+      user: userId,
+      isPaid: true,
+      status: { $nin: ['pending', 'cancelled'] }
+    })
       .populate('items.product')
       .sort({ createdAt: -1 });
     
