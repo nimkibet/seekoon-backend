@@ -16,7 +16,8 @@ router.use(protect);
 
 router.get('/', getCart);                           // GET /api/cart
 router.post('/add', addToCart);                     // POST /api/cart/add
-router.patch('/update', updateCartItemQuantity);    // PATCH /api/cart/update
+// @route   PATCH /api/cart/update - Updates item quantity in cart
+router.patch('/update', updateCartItemQuantity);
 router.delete('/remove/:productId', removeFromCart);           // DELETE /api/cart/remove/:productId
 router.delete('/clear', clearCart);                 // DELETE /api/cart/clear
 
